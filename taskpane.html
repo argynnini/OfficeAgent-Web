@@ -26,52 +26,52 @@
         box-sizing: border-box;
         max-width: 390px;
         margin: 0 auto 16px;
-        padding: 12px 15px 15px;
+        padding: 8px 12px 10px;
         background: #ffff9a;
         color: #000;
         border: 2px solid #a0821e;
-        border-radius: 15px;
+        border-radius: 12px;
         font-family: "MS UI Gothic", "Yu Gothic UI", sans-serif;
       }
       /* しっぽ: 下枠線を塗りで隠して斜辺だけ線を引く (VSTO は輪郭が 1 本の連続した線) */
       .balloon .tail { position: absolute; top: 100%; left: max(24px, calc(50% - 9px - 80px)); width: 22px; height: 16px; overflow: visible; }
-      .balloon .title { font-size: 21px; margin: 6px 0 12px; }
+      .balloon .title { font-size: 15px; margin: 2px 0 8px; }
       .balloon textarea {
         display: block;
         width: 100%;
         box-sizing: border-box;
-        height: 60px;
-        padding: 2px 3px;
+        height: 44px;
+        padding: 2px 4px;
         border: 1px solid #000;
         background: #fff;
         color: #000;
-        font: 16px "MS UI Gothic", "Yu Gothic UI", sans-serif;
+        font: 13px "MS UI Gothic", "Yu Gothic UI", sans-serif;
         resize: none;
       }
       .balloon textarea::placeholder { color: #a0a0a0; opacity: 1; }
       .balloon textarea:focus { outline: none; }
       .balloon textarea:focus::placeholder { color: transparent; }
-      .balloon .buttons { display: flex; gap: 12px; margin-top: 14px; }
+      .balloon .buttons { display: flex; gap: 8px; margin-top: 8px; }
       .balloon button {
         flex: 1;
-        max-width: 130px;
-        height: 35px;
+        max-width: 96px;
+        height: 26px;
         background: #ffff9a;
         color: #000;
         border: 1px solid #000;
-        font: 15px "MS UI Gothic", "Yu Gothic UI", sans-serif;
+        font: 13px "MS UI Gothic", "Yu Gothic UI", sans-serif;
         cursor: pointer;
       }
       .balloon select {
         flex: 1;
         min-width: 0;
-        height: 35px;
-        padding: 0 4px;
+        height: 26px;
+        padding: 0 2px;
         background: #ffff9a;
         color: #000;
         border: 1px solid #000;
         border-radius: 0;
-        font: 15px "MS UI Gothic", "Yu Gothic UI", sans-serif;
+        font: 13px "MS UI Gothic", "Yu Gothic UI", sans-serif;
         cursor: pointer;
       }
       .balloon button:hover { background: #ffffc4; }
