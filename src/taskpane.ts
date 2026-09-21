@@ -1,7 +1,7 @@
 import { AcsPlayer } from "./acs/player";
 import { AcsCharacter } from "./acs/reader";
 import { IdleController, isIdleName } from "./idle";
-import { buildSearchUrl, SEARCH_ENGINES } from "./search";
+import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -136,7 +136,7 @@ function onSelectionChanged() {
 
 // --- ウェブ検索 (検索エンジンの URL をブラウザで開く) ---
 const ENGINE_KEY = "officeagent.engine";
-engineSelect.replaceChildren(...SEARCH_ENGINES.map((e, i) => new Option(e.name, String(i))));
+engineSelect.replaceChildren(...SEARCH_ENGINES.map((e, i) => new Option(e.embedPrefix ? e.name + "（ペイン内）" : e.name, String(i))));
 try {
   engineSelect.value = localStorage.getItem(ENGINE_KEY) ?? "0";
 } catch { /* 保存できない環境では既定のまま */ }
@@ -198,15 +198,45 @@ function playThinking() {
   });
 }
 
+// --- 検索結果をペイン内 (iframe) に表示する。埋め込みを拒否するエンジンは別タブで開く ---
+const results = $("results");
+const resultsFrame = $<HTMLIFrameElement>("results-frame");
+const resultsTitle = $("results-title");
+/** 「ブラウザで開く」用: 表示中の検索を別タブで開く URL */
+let resultsExternalUrl: string | undefined;
+
+function showResults(engineName: string, embedUrl: string, externalUrl: string) {
+  resultsExternalUrl = externalUrl;
+  resultsTitle.textContent = `${engineName} の検索結果`;
+  resultsFrame.src = embedUrl;
+  results.hidden = false;
+}
+
+function closeResults() {
+  results.hidden = true;
+  resultsFrame.src = "about:blank";
+  resultsExternalUrl = undefined;
+}
+
+function openExternal(url: string) {
+  // ユーザー操作の直後に開く (ポップアップブロック回避)
+  const win = window.open(url, "_blank");
+  if (win) win.opener = null;
+  else status.textContent = "ブラウザに検索ページを開くのをブロックされました。許可してください。";
+}
+
+$("results-close").addEventListener("click", closeResults);
+$("results-open").addEventListener("click", () => resultsExternalUrl && openExternal(resultsExternalUrl));
+
 function runSearch() {
   const text = queryInput.value.trim();
   const engine = SEARCH_ENGINES[Number(engineSelect.value)];
   if (!text || !engine) return;
   playThinking();
-  // ユーザー操作の直後に開く (ポップアップブロック回避)
-  const win = window.open(buildSearchUrl(engine, text), "_blank");
-  if (win) win.opener = null;
-  else status.textContent = "ブラウザに検索ページを開くのをブロックされました。許可してください。";
+
+  const embedUrl = buildEmbedUrl(engine, text);
+  if (embedUrl) showResults(engine.name, embedUrl, buildSearchUrl(engine, text));
+  else openExternal(buildSearchUrl(engine, text));
 }
 
 $("search").addEventListener("click", runSearch);

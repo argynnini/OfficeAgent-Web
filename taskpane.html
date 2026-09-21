@@ -99,9 +99,28 @@
       }
       .balloon button:hover { background: #ffffc4; }
       .balloon button:active { background: #f0f07a; }
+
+      /* 検索結果 (iframe) */
+      .results { flex: 1 1 auto; min-height: 220px; display: flex; flex-direction: column; margin-bottom: 8px; border: 1px solid #999; border-radius: 6px; overflow: hidden; background: #fff; color: #000; }
+      .results[hidden] { display: none; }
+      .results-bar { display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 8px; background: #f0f0f0; border-bottom: 1px solid #ccc; font-size: 12px; }
+      .results-bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .bar-btn { width: 24px; height: 24px; padding: 0; background: transparent; border: 1px solid transparent; border-radius: 3px; color: #333; font-size: 14px; line-height: 1; cursor: pointer; }
+      .bar-btn:hover { background: #e0e0e0; border-color: #bbb; }
+      .results iframe { flex: 1 1 auto; width: 100%; border: 0; background: #fff; }
     </style>
   </head>
   <body>
+    <!-- 検索結果 (埋め込みを許すエンジンのみ)。吹き出しとカイル君の上の余白いっぱいに広げる -->
+    <div id="results" class="results" hidden>
+      <div class="results-bar">
+        <span id="results-title">検索結果</span>
+        <button id="results-open" type="button" class="bar-btn" title="ブラウザで開く&#10;結果のリンク先は、ペイン内に表示できないサイトが多いためです。">↗</button>
+        <button id="results-close" type="button" class="bar-btn" title="結果を閉じる">×</button>
+      </div>
+      <iframe id="results-frame" title="検索結果" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+    </div>
+
     <div id="dock">
       <div class="balloon">
         <div class="title">何について調べますか？</div>
