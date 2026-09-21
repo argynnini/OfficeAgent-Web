@@ -294,10 +294,13 @@ queryInput.addEventListener("query-tab", () => {
   }
 });
 
-// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)
+// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)。検索したら入力欄のフォーカスを外す
 queryInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
+    // 先にフォーカスを外す: Writing をやめる動き (blur) が終わってから Thinking を始める。
+    // 逆にすると、blur の処理が始まったばかりの Thinking を終わらせてしまう
+    queryInput.blur();
     runSearch();
   }
 });
