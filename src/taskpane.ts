@@ -76,8 +76,10 @@ function useCharacter(data: ArrayBuffer, name: string) {
   idle.userActivity();
   const rest = character.animations.get("RestPose") ?? character.animations.values().next().value;
   if (rest?.frames[0]) player.draw(rest.frames[0]);
-  // キャラクター名 (ACS に埋め込まれた名前。読めなければファイル名から拡張子を除いたもの)
-  status.textContent = character.name || name.replace(/\.[^.]+$/, "");
+  // キャラクター名 (ACS に埋め込まれた名前。読めなければファイル名から拡張子を除いたもの) はツールチップに出す
+  const displayName = character.name || name.replace(/\.[^.]+$/, "");
+  canvas.title = `${displayName}\nクリックでアニメーション`;
+  status.textContent = "";
 
   const names = [...character.animations.keys()].sort();
   flyout.replaceChildren(
