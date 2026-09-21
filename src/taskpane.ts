@@ -12,7 +12,6 @@ const selectionInfo = $("selection-info");
 const animSelect = $<HTMLSelectElement>("animations");
 const playButton = $<HTMLButtonElement>("play");
 const queryInput = $<HTMLTextAreaElement>("query");
-const balloon = $("balloon");
 const engineSelect = $<HTMLSelectElement>("engine");
 const fileInput = $<HTMLInputElement>("file");
 const soundCheck = $<HTMLInputElement>("sound");
@@ -154,20 +153,8 @@ queryInput.addEventListener("keydown", (e) => {
   }
 });
 
-/** 吹き出しを閉じる: Writing をやめる動きを再生して待機ポーズへ (blur が担当) */
-function closeBalloon() {
-  queryInput.blur();
-  balloon.hidden = true;
-}
-
-function openBalloon() {
-  balloon.hidden = false;
-  queryInput.focus();
-}
-
-$("close").addEventListener("click", closeBalloon);
-// VSTO 版と同じく、カイル君をクリックすると検索吹き出しが開く
-canvas.addEventListener("click", openBalloon);
+// カイル君をクリックするとランダムにアニメーション
+canvas.addEventListener("click", playRandom);
 playButton.addEventListener("click", () => void player?.play(animSelect.value));
 animSelect.addEventListener("change", () => void player?.play(animSelect.value));
 $("pick").addEventListener("click", () => fileInput.click());

@@ -33,7 +33,6 @@
         border-radius: 15px;
         font-family: "MS UI Gothic", "Yu Gothic UI", sans-serif;
       }
-      .balloon[hidden] { display: none; }
       /* しっぽ: 下枠線を塗りで隠して斜辺だけ線を引く (VSTO は輪郭が 1 本の連続した線) */
       .balloon .tail { position: absolute; top: 100%; left: max(24px, calc(50% - 9px - 80px)); width: 22px; height: 16px; overflow: visible; }
       .balloon .title { font-size: 21px; margin: 6px 0 12px; }
@@ -52,7 +51,7 @@
       .balloon textarea::placeholder { color: #a0a0a0; opacity: 1; }
       .balloon textarea:focus { outline: none; }
       .balloon textarea:focus::placeholder { color: transparent; }
-      .balloon .buttons { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
+      .balloon .buttons { display: flex; gap: 12px; margin-top: 14px; }
       .balloon button {
         flex: 1;
         max-width: 130px;
@@ -60,6 +59,18 @@
         background: #ffff9a;
         color: #000;
         border: 1px solid #000;
+        font: 15px "MS UI Gothic", "Yu Gothic UI", sans-serif;
+        cursor: pointer;
+      }
+      .balloon select {
+        flex: 1;
+        min-width: 0;
+        height: 35px;
+        padding: 0 4px;
+        background: #ffff9a;
+        color: #000;
+        border: 1px solid #000;
+        border-radius: 0;
         font: 15px "MS UI Gothic", "Yu Gothic UI", sans-serif;
         cursor: pointer;
       }
@@ -77,19 +88,16 @@
       <select id="animations" disabled style="max-width:200px"></select>
       <button id="play" type="button" disabled>再生</button>
     </div>
-    <div class="row" style="margin-top:8px">
-      <label>検索エンジン <select id="engine"></select></label>
-    </div>
     <div id="status" class="muted" style="text-align:center;margin-top:8px"></div>
     <div id="selection" class="muted">選択範囲がここに表示されます</div>
     <div id="selection-info" class="muted" style="margin-top:4px;font-size:11px"></div>
 
     <div id="dock">
-      <div id="balloon" class="balloon">
+      <div class="balloon">
         <div class="title">何について調べますか？</div>
         <textarea id="query" maxlength="10000" placeholder="ここに質問文を入力し、［検索］ をクリックしてください！"></textarea>
         <div class="buttons">
-          <button id="close" type="button" title="吹き出しを閉じます">閉じる(<u>C</u>)</button>
+          <select id="engine" title="検索エンジン"></select>
           <button id="search" type="button">検索(<u>S</u>)</button>
         </div>
         <svg class="tail" viewBox="0 0 22 16" aria-hidden="true">
@@ -98,7 +106,7 @@
           <line x1="1" y1="-1" x2="17" y2="-1" stroke="#ffff9a" stroke-width="3" />
         </svg>
       </div>
-      <canvas id="stage" width="128" height="128" title="クリックで検索吹き出しを開く"></canvas>
+      <canvas id="stage" width="128" height="128" title="クリックでアニメーション"></canvas>
     </div>
     <script type="module" src="/src/taskpane.ts"></script>
   </body>
