@@ -74,6 +74,8 @@
       .balloon textarea::placeholder { color: #a0a0a0; opacity: 1; }
       .balloon textarea:focus { outline: none; }
       .balloon textarea:focus::placeholder { color: transparent; }
+      /* 本文の選択範囲を候補として表示しているときは、フォーカス中も見えるままにする (Tab で挿入) */
+      .balloon textarea.suggest:focus::placeholder { color: #a0a0a0; }
       .balloon .buttons { display: flex; gap: 8px; margin-top: 8px; }
       .balloon button {
         flex: 1;
@@ -124,7 +126,7 @@
     <div id="dock">
       <div class="balloon">
         <div class="title">何について調べますか？</div>
-        <textarea id="query" maxlength="10000" placeholder="ここに質問文を入力し、［検索］ をクリックしてください！"></textarea>
+        <textarea id="query" maxlength="10000" title="本文を選択すると、その文字が薄く表示されます。Tab キーで挿入できます。" placeholder="ここに質問文を入力し、［検索］ をクリックしてください！"></textarea>
         <div class="buttons">
           <select id="engine" title="検索エンジン"></select>
           <button id="search" type="button" title="Alt+S">検索(<u>S</u>)</button>

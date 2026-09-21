@@ -107,15 +107,30 @@ async function pickFile(file: File) {
 
 let eventCount = 0;
 
+// --- 本文の選択範囲を、吹き出しのプレースホルダーに薄く表示し、Tab で挿入できるようにする ---
+const DEFAULT_PLACEHOLDER = queryInput.placeholder;
+const PLACEHOLDER_MAX_CHARS = 120;
+/** 本文で選択中のテキスト (なければ空) */
+let suggestion = "";
+
+function setSuggestion(text: string) {
+  suggestion = text.trim();
+  const flat = suggestion.replace(/\s+/g, " ");
+  queryInput.placeholder = !flat ? DEFAULT_PLACEHOLDER : flat.length > PLACEHOLDER_MAX_CHARS ? flat.slice(0, PLACEHOLDER_MAX_CHARS) + "…" : flat;
+  queryInput.classList.toggle("suggest", flat !== "");
+}
+
 function showSelection() {
   if (typeof Office === "undefined" || !Office.context?.document) return;
   Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (r) => {
     if (r.status !== Office.AsyncResultStatus.Succeeded) {
       selectionBox.textContent = `選択範囲を取得できません: ${r.error.message}`;
+      setSuggestion("");
       return;
     }
     const text = String(r.value ?? "");
     selectionBox.textContent = text || "(選択なし)";
+    setSuggestion(text);
     selectionInfo.textContent = `選択変更イベント: ${eventCount} 回 / 取得した文字数: ${text.length}`;
   });
 }
@@ -267,8 +282,14 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)
+// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)。入力欄が空で本文を選択中なら、Tab で選択範囲を挿入する
 queryInput.addEventListener("keydown", (e) => {
+  if (e.key === "Tab" && !e.shiftKey && !e.isComposing && suggestion && queryInput.value === "") {
+    e.preventDefault();
+    queryInput.value = suggestion.slice(0, queryInput.maxLength);
+    queryInput.setSelectionRange(queryInput.value.length, queryInput.value.length);
+    return;
+  }
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
     runSearch();
