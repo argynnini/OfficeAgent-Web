@@ -8,8 +8,6 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const canvas = $<HTMLCanvasElement>("stage");
 const status = $("status");
 const hostLabel = $("host");
-const selectionBox = $("selection");
-const selectionInfo = $("selection-info");
 const flyout = $("flyout");
 const playButton = $<HTMLButtonElement>("play");
 const queryInput = $<HTMLTextAreaElement>("query");
@@ -105,8 +103,6 @@ async function pickFile(file: File) {
   }
 }
 
-let eventCount = 0;
-
 // --- 本文の選択範囲を、吹き出しのプレースホルダーに薄く表示し、Tab で挿入できるようにする ---
 const DEFAULT_PLACEHOLDER = queryInput.placeholder;
 const PLACEHOLDER_MAX_CHARS = 120;
@@ -127,20 +123,16 @@ function showSelection() {
   if (typeof Office === "undefined" || !Office.context?.document) return;
   Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (r) => {
     if (r.status !== Office.AsyncResultStatus.Succeeded) {
-      selectionBox.textContent = `選択範囲を取得できません: ${r.error.message}`;
       setSuggestion("");
       return;
     }
     const text = String(r.value ?? "");
-    selectionBox.textContent = text || "(選択なし)";
     setSuggestion(text);
-    selectionInfo.textContent = `選択変更イベント: ${eventCount} 回 / 取得した文字数: ${text.length}`;
   });
 }
 
 function onSelectionChanged() {
   idle.userActivity();
-  eventCount++;
   showSelection();
 }
 
@@ -225,14 +217,39 @@ function cancelThinking() {
   window.clearTimeout(thinkingTimer);
 }
 
-/** 読み込み完了: Thinking を終了分岐で自然に終わらせ、入力中なら Writing、そうでなければ待機ポーズへ */
-function stopThinking() {
-  if (!thinking) return;
+/** 検索結果の読み込み待ちか (読み込み完了で GetWizardy を再生するための印) */
+let searchPending = false;
+
+/** 検索の後始末: 入力中なら Writing、そうでなければ待機ポーズへ */
+function afterSearch() {
+  if (focused) playWriting();
+  else if (!player?.isPlaying) drawRest();
+}
+
+/**
+ * Thinking を終了分岐で自然に終わらせる。
+ * completed (検索結果の読み込み完了) のときは、そのあと GetWizardy があれば再生する (なければ何もしない)。
+ * 読み込みが終わらずタイムアウトしたときは completed=false で、Thinking を止めるだけ。
+ */
+function stopThinking(completed = false) {
+  const wasThinking = thinking;
   cancelThinking();
-  void player?.release().then(() => {
-    if (focused) playWriting();
-    else if (!player?.isPlaying) drawRest();
+  if (!wasThinking && !completed) return;
+  // Thinking を自分で別のアニメーションに切り替えていたら、その再生を邪魔しない
+  if (!wasThinking && userAnimationPlaying()) return;
+
+  void ((wasThinking && player?.release()) || Promise.resolve()).then(() => {
+    const name = completed ? firstAnimation("GetWizardy") : undefined;
+    if (name && player) void player.play(name).then(afterSearch);
+    else afterSearch();
   });
+}
+
+/** 検索結果の読み込み完了 */
+function onSearchLoaded() {
+  if (!searchPending) return;
+  searchPending = false;
+  stopThinking(true);
 }
 
 // --- 検索結果をペイン内 (iframe) に表示する。埋め込みを拒否するエンジンは別タブで開く ---
@@ -250,6 +267,9 @@ function showResults(engineName: string, embedUrl: string, externalUrl: string) 
 }
 
 function closeResults() {
+  // 読み込み中に閉じたら、完了扱いにはせず (GetWizardy は再生しない)、Thinking だけ止める
+  searchPending = false;
+  stopThinking();
   results.hidden = true;
   resultsFrame.src = "about:blank";
   resultsExternalUrl = undefined;
@@ -262,8 +282,8 @@ function openExternal(url: string) {
   else status.textContent = "ブラウザに検索ページを開くのをブロックされました。許可してください。";
 }
 
-// 検索結果の読み込みが終わったら Thinking を終える (about:blank への切り替えなど、Thinking 中でなければ何もしない)
-resultsFrame.addEventListener("load", stopThinking);
+// 検索結果の読み込みが終わったら Thinking を終え、GetWizardy があれば再生する (検索中でなければ何もしない)
+resultsFrame.addEventListener("load", onSearchLoaded);
 $("results-close").addEventListener("click", closeResults);
 $("results-open").addEventListener("click", () => resultsExternalUrl && openExternal(resultsExternalUrl));
 
@@ -272,6 +292,7 @@ function runSearch() {
   const engine = SEARCH_ENGINES.find((e) => e.name === engineSelect.value);
   if (!text || !engine) return;
   playThinking();
+  searchPending = true;
 
   showResults(engine.name, buildEmbedUrl(engine, text), buildSearchUrl(engine, text));
 }
@@ -339,7 +360,7 @@ void Office.onReady(async (info) => {
   if (info.host) {
     Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged, (r) => {
       if (r.status !== Office.AsyncResultStatus.Succeeded) {
-        selectionInfo.textContent = `選択変更イベントを登録できません: ${r.error.message}`;
+        status.textContent = `選択変更イベントを登録できません: ${r.error.message}`;
       }
     });
     showSelection();
