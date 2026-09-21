@@ -189,14 +189,39 @@ const idle = new IdleController({
 idle.start();
 for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => idle.userActivity());
 
-/** 検索実行時は Thinking を 1 回再生し、終わったらフォーカス中なら Writing に戻る */
+/** 読み込みが終わらないまま Thinking が続き続けないようにする上限 */
+const THINKING_MAX_MS = 20_000;
+let thinkingTimer: number | undefined;
+
+/** 検索の読み込み中は Thinking を繰り返す。stopThinking() (読み込み完了) で終わる */
 function playThinking() {
   const name = firstAnimation("Thinking", "Processing");
   if (!name || !player) return;
   thinking = true;
-  void player.play(name).then(() => {
-    thinking = false;
-    playWriting();
+  window.clearTimeout(thinkingTimer);
+  thinkingTimer = window.setTimeout(stopThinking, THINKING_MAX_MS);
+
+  const loop = (first: boolean) => {
+    if (!thinking || !player) return;
+    // 2 回目以降: 別のアニメーション (メニュー選択など) に切り替えられていたら、Thinking は諦める
+    if (!first && player.isPlaying) return cancelThinking();
+    void player.play(name).then(() => loop(false));
+  };
+  loop(true);
+}
+
+function cancelThinking() {
+  thinking = false;
+  window.clearTimeout(thinkingTimer);
+}
+
+/** 読み込み完了: Thinking を終了分岐で自然に終わらせ、入力中なら Writing、そうでなければ待機ポーズへ */
+function stopThinking() {
+  if (!thinking) return;
+  cancelThinking();
+  void player?.release().then(() => {
+    if (focused) playWriting();
+    else if (!player?.isPlaying) drawRest();
   });
 }
 
@@ -227,6 +252,8 @@ function openExternal(url: string) {
   else status.textContent = "ブラウザに検索ページを開くのをブロックされました。許可してください。";
 }
 
+// 検索結果の読み込みが終わったら Thinking を終える (about:blank への切り替えなど、Thinking 中でなければ何もしない)
+resultsFrame.addEventListener("load", stopThinking);
 $("results-close").addEventListener("click", closeResults);
 $("results-open").addEventListener("click", () => resultsExternalUrl && openExternal(resultsExternalUrl));
 
@@ -261,6 +288,7 @@ canvas.addEventListener("click", playRandom);
 // 再生ボタン: 再生中はクリックで停止して待機ポーズへ。待機中 (待機動作の再生中を含む) は直前のアニメーションをもう一度 (未選択ならランダム)
 playButton.addEventListener("click", () => {
   if (player && userAnimationPlaying()) {
+    cancelThinking(); // 停止ボタンで Thinking も止める (繰り返しを再開させない)
     player.stop();
     drawRest();
   } else if (lastAnimation) {
