@@ -1,6 +1,21 @@
 import { decodeWav } from "./wav";
 import type { AcsCharacter, Animation, Frame } from "./reader";
 
+/**
+ * 描画の色空間。ACS の色は、Windows (GDI) では、色の変換なしで、そのまま画面に出る (本家 = VSTO 版の見た目)。
+ * ブラウザは、既定の sRGB のままだと、ワイドガモットのディスプレイの色空間へ変換して、鮮やかさが落ちる
+ * (例: 青 (0,153,255) の赤成分が 0 → 約 70 になり、くすんで見える)。
+ * display-p3 として描くと、そのディスプレイでは、本家とほぼ同じ数値になる。非対応の環境では sRGB のまま。
+ */
+const COLOR_SPACE: PredefinedColorSpace = (() => {
+  try {
+    const ctx = document.createElement("canvas").getContext("2d", { colorSpace: "display-p3" });
+    return ctx?.getContextAttributes().colorSpace === "display-p3" ? "display-p3" : "srgb";
+  } catch {
+    return "srgb";
+  }
+})();
+
 /** ACS キャラクターのアニメーションを canvas に再生する */
 export class AcsPlayer {
   private readonly ctx: CanvasRenderingContext2D;
@@ -27,7 +42,7 @@ export class AcsPlayer {
   ) {
     canvas.width = character.width;
     canvas.height = character.height;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { colorSpace: COLOR_SPACE });
     if (!ctx) throw new Error("canvas 2d を取得できません");
     this.ctx = ctx;
   }
@@ -148,7 +163,8 @@ export class AcsPlayer {
     c = document.createElement("canvas");
     c.width = img.width;
     c.height = img.height;
-    c.getContext("2d")!.putImageData(new ImageData(img.rgba, img.width, img.height), 0, 0);
+    // 画像の数値も、同じ色空間として扱う (sRGB のキャンバスとの間で、変換が入らないようにする)
+    c.getContext("2d", { colorSpace: COLOR_SPACE })!.putImageData(new ImageData(img.rgba, img.width, img.height, { colorSpace: COLOR_SPACE }), 0, 0);
     this.sprites.set(index, c);
     return c;
   }
