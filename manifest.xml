@@ -10,8 +10,8 @@
   <Version>1.0.0.0</Version>
   <ProviderName>OfficeAgent</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
-  <DisplayName DefaultValue="カイル君"/>
-  <Description DefaultValue="Office にカイル君を呼び出します。"/>
+  <DisplayName DefaultValue="OfficeAgent"/>
+  <Description DefaultValue="Office にキャラクターを呼び出して、ウェブ検索などを手伝ってもらいます。"/>
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
   <SupportUrl DefaultValue="https://github.com/argynnini/OfficeAgent"/>
@@ -144,11 +144,11 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="Group.Label" DefaultValue="カイル君"/>
-        <bt:String id="Button.Label" DefaultValue="カイル君を呼ぶ"/>
+        <bt:String id="Group.Label" DefaultValue="OfficeAgent"/>
+        <bt:String id="Button.Label" DefaultValue="呼び出す"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="Button.Tip" DefaultValue="作業ウィンドウにカイル君を表示します。"/>
+        <bt:String id="Button.Tip" DefaultValue="作業ウィンドウに OfficeAgent を表示します。"/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
