@@ -16,40 +16,55 @@
       #selection { color: #555; margin-top: 12px; padding: 8px; background: #f4f4f4; border-radius: 4px; white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow: auto; }
       #host { text-align: center; margin-bottom: 4px; }
 
-      /* Microsoft Agent 風の吹き出し。テーマ (ライト/ダーク) に関わらず同じ配色にする */
+      /*
+       * 検索吹き出し。VSTO 版 SearchBalloonForm と同じ配色・寸法:
+       *   背景 RGB(255,255,154) / 枠 RGB(160,130,30) 2px / 角丸 15 / しっぽ 高さ14・半幅9・先端は右に12
+       * テーマ (ライト/ダーク) に関わらず同じ配色にする
+       */
       .balloon {
         position: relative;
-        margin: 0 4px 18px;
-        padding: 10px;
-        background: #ffffe1;
+        box-sizing: border-box;
+        max-width: 390px;
+        margin: 0 auto 16px;
+        padding: 12px 15px 15px;
+        background: #ffff9a;
         color: #000;
-        border: 1px solid #000;
-        border-radius: 10px;
-        box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.25);
+        border: 2px solid #a0821e;
+        border-radius: 15px;
+        font-family: "MS UI Gothic", "Yu Gothic UI", sans-serif;
       }
-      /* しっぽ (下のカイル君を指す)。外側が枠線、内側が塗り */
-      .balloon::before,
-      .balloon::after {
-        content: "";
-        position: absolute;
-        left: 50%;
-        border-style: solid;
-        border-color: transparent;
-      }
-      .balloon::before { bottom: -13px; margin-left: -9px; border-width: 13px 9px 0; border-top-color: #000; }
-      .balloon::after { bottom: -11px; margin-left: -8px; border-width: 12px 8px 0; border-top-color: #ffffe1; }
-      .balloon input[type="text"] {
+      .balloon[hidden] { display: none; }
+      /* しっぽ: 下枠線を塗りで隠して斜辺だけ線を引く (VSTO は輪郭が 1 本の連続した線) */
+      .balloon .tail { position: absolute; top: 100%; left: calc(50% - 9px); width: 22px; height: 16px; overflow: visible; }
+      .balloon .title { font-size: 21px; margin: 6px 0 12px; }
+      .balloon textarea {
+        display: block;
         width: 100%;
         box-sizing: border-box;
-        padding: 6px 8px;
-        border: 1px solid #b5b58a;
-        border-radius: 4px;
+        height: 60px;
+        padding: 2px 3px;
+        border: 1px solid #000;
         background: #fff;
         color: #000;
-        font: inherit;
+        font: 16px "MS UI Gothic", "Yu Gothic UI", sans-serif;
+        resize: none;
       }
-      .balloon input[type="text"]:focus { outline: 2px solid #f0b400; outline-offset: 0; }
-      .balloon select, .balloon button { font: inherit; color: #000; }
+      .balloon textarea::placeholder { color: #a0a0a0; opacity: 1; }
+      .balloon textarea:focus { outline: none; }
+      .balloon textarea:focus::placeholder { color: transparent; }
+      .balloon .buttons { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
+      .balloon button {
+        flex: 1;
+        max-width: 130px;
+        height: 35px;
+        background: #ffff9a;
+        color: #000;
+        border: 1px solid #000;
+        font: 15px "MS UI Gothic", "Yu Gothic UI", sans-serif;
+        cursor: pointer;
+      }
+      .balloon button:hover { background: #ffffc4; }
+      .balloon button:active { background: #f0f07a; }
     </style>
   </head>
   <body>
@@ -62,19 +77,28 @@
       <select id="animations" disabled style="max-width:200px"></select>
       <button id="play" type="button" disabled>再生</button>
     </div>
+    <div class="row" style="margin-top:8px">
+      <label>検索エンジン <select id="engine"></select></label>
+    </div>
     <div id="status" class="muted" style="text-align:center;margin-top:8px"></div>
     <div id="selection" class="muted">選択範囲がここに表示されます</div>
     <div id="selection-info" class="muted" style="margin-top:4px;font-size:11px"></div>
 
     <div id="dock">
-      <div class="balloon">
-        <input id="query" type="text" placeholder="調べたいことを入力" />
-        <div class="row" style="margin-top:8px">
-          <select id="engine"></select>
-          <button id="search" type="button">検索</button>
+      <div id="balloon" class="balloon">
+        <div class="title">何について調べますか？</div>
+        <textarea id="query" maxlength="10000" placeholder="ここに質問文を入力し、［検索］ をクリックしてください！"></textarea>
+        <div class="buttons">
+          <button id="close" type="button" title="吹き出しを閉じます">閉じる(<u>C</u>)</button>
+          <button id="search" type="button">検索(<u>S</u>)</button>
         </div>
+        <svg class="tail" viewBox="0 0 22 16" aria-hidden="true">
+          <polygon points="0,0 18,0 21,16" fill="#ffff9a" />
+          <polyline points="0,0 21,16 18,0" fill="none" stroke="#a0821e" stroke-width="2" />
+          <line x1="1" y1="-1" x2="17" y2="-1" stroke="#ffff9a" stroke-width="3" />
+        </svg>
       </div>
-      <canvas id="stage" width="128" height="128" title="クリックでアニメーション"></canvas>
+      <canvas id="stage" width="128" height="128" title="クリックで検索吹き出しを開く"></canvas>
     </div>
     <script type="module" src="/src/taskpane.ts"></script>
   </body>

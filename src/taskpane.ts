@@ -11,7 +11,8 @@ const selectionBox = $("selection");
 const selectionInfo = $("selection-info");
 const animSelect = $<HTMLSelectElement>("animations");
 const playButton = $<HTMLButtonElement>("play");
-const queryInput = $<HTMLInputElement>("query");
+const queryInput = $<HTMLTextAreaElement>("query");
+const balloon = $("balloon");
 const engineSelect = $<HTMLSelectElement>("engine");
 const fileInput = $<HTMLInputElement>("file");
 const soundCheck = $<HTMLInputElement>("sound");
@@ -145,11 +146,28 @@ function runSearch() {
 }
 
 $("search").addEventListener("click", runSearch);
+// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)
 queryInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.isComposing) runSearch();
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    runSearch();
+  }
 });
 
-canvas.addEventListener("click", playRandom);
+/** 吹き出しを閉じる: Writing をやめる動きを再生して待機ポーズへ (blur が担当) */
+function closeBalloon() {
+  queryInput.blur();
+  balloon.hidden = true;
+}
+
+function openBalloon() {
+  balloon.hidden = false;
+  queryInput.focus();
+}
+
+$("close").addEventListener("click", closeBalloon);
+// VSTO 版と同じく、カイル君をクリックすると検索吹き出しが開く
+canvas.addEventListener("click", openBalloon);
 playButton.addEventListener("click", () => void player?.play(animSelect.value));
 animSelect.addEventListener("change", () => void player?.play(animSelect.value));
 $("pick").addEventListener("click", () => fileInput.click());
