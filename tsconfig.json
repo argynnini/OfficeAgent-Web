@@ -8,7 +8,7 @@
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client", "office-js"]
   },
-  "include": ["src", "scripts"]
+  "include": ["src", "scripts", "vite.config.ts"]
 }

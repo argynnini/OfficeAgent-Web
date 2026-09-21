@@ -21,10 +21,27 @@ npx tsx scripts/render.ts path/to/Merlin.acs RestPose out.png   # 先頭フレ�
 現状: ACS のパース（キャラクター情報・アニメーション・画像）、独自圧縮の展開、canvas での再生（分岐あり）まで。
 未対応: 口パク（overlay）、サウンド、終了分岐、状態（States）。
 
+## Office に読み込む（開発用サイドロード）
+
+Office は HTTPS のアドインしか読み込まないため、最初に 1 回だけ開発用証明書を信頼させます（管理者確認のダイアログが出ます）。
+
+```sh
+npx office-addin-dev-certs install   # 初回のみ
+npm run dev                          # https://localhost:3000 で起動
+npm run validate                     # manifest.xml の検証
+```
+
+- **Web 版**: Word/Excel/PowerPoint on the web で、[挿入] > [アドイン] > [マイ アドイン] > [カスタム アドインのアップロード] から `manifest.xml` を選ぶ
+- **デスクトップ版 (Windows)**: `manifest.xml` を置いた共有フォルダを [信頼できるアドイン カタログ] に登録して読み込む
+
+読み込むと [ホーム] タブに「カイル君を呼ぶ」ボタンが出て、作業ウィンドウにカイル君が表示されます。
+`.acs` は再配布できないので、ペインの「キャラクターを選ぶ」で 1 回選ぶと IndexedDB に保存され、次回から自動で読み込まれます。
+選択範囲が変わると、カイル君がランダムなアニメーションで反応します。
+
 ## ロードマップ
 
 1. ~~ACS パーサ + canvas 再生のプロトタイプ~~（済）
-2. タスクペインに表示し、吹き出しで AI に質問
+2. ~~タスクペインに表示~~（済） / 吹き出しで AI に質問
 3. 選択範囲の要約・翻訳・解説・誤字脱字チェック
 4. Excel シート追加や選択変更などのイベント連動アニメ
 5. Web Speech API によるノート読み上げ
