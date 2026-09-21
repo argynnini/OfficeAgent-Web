@@ -13,8 +13,9 @@ export interface SearchEngine {
 }
 
 export const SEARCH_ENGINES: SearchEngine[] = [
-  // Google は iframe 表示を拒否する (igu=1 という非公式の回避策は、確認画面 (reCAPTCHA) に止められて当てにならない)
-  { name: "Google", prefix: "https://www.google.com/search?q=", suffix: "" },
+  // Google は通常の検索ページの iframe 表示を拒否するが、igu=1 を付けると表示できる (非公式のパラメーターなので、
+  // いつ使えなくなるか分からない。ボット判定の確認画面 (reCAPTCHA) が出ることもある。その場合は結果パネルの「↗」でブラウザで開く)
+  { name: "Google", prefix: "https://www.google.com/search?q=", suffix: "", embedPrefix: "https://www.google.com/search?igu=1&q=" },
   { name: "Bing", prefix: "https://www.bing.com/search?q=", suffix: "", embedPrefix: "https://www.bing.com/search?q=" },
   { name: "Yahoo!", prefix: "https://search.yahoo.co.jp/search?p=", suffix: "" },
   { name: "YouTube", prefix: "https://www.youtube.com/search?q=", suffix: "" },

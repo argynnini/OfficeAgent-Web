@@ -20,6 +20,7 @@
     <AppDomain>https://localhost:3000</AppDomain>
     <!-- 検索結果を作業ウィンドウ内 (iframe) に表示するエンジン -->
     <AppDomain>https://www.bing.com</AppDomain>
+    <AppDomain>https://www.google.com</AppDomain>
     <AppDomain>https://ja.wikipedia.org</AppDomain>
   </AppDomains>
 
