@@ -14,7 +14,18 @@ const playButton = $<HTMLButtonElement>("play");
 const queryInput = $<HTMLTextAreaElement>("query");
 const engineSelect = $<HTMLSelectElement>("engine");
 const fileInput = $<HTMLInputElement>("file");
-const soundCheck = $<HTMLInputElement>("sound");
+const soundButton = $<HTMLButtonElement>("sound");
+const SOUND_KEY = "officeagent.sound";
+let soundOn = true;
+try {
+  soundOn = localStorage.getItem(SOUND_KEY) !== "off";
+} catch { /* 保存できない環境では既定 (オン) */ }
+
+function renderSoundButton() {
+  soundButton.setAttribute("aria-pressed", String(soundOn));
+  soundButton.title = soundOn ? "効果音: オン\nクリックでオフにします。" : "効果音: オフ\nクリックでオンにします。";
+}
+renderSoundButton();
 
 let player: AcsPlayer | undefined;
 let character: AcsCharacter | undefined;
@@ -35,7 +46,7 @@ function useCharacter(data: ArrayBuffer, name: string) {
   player?.stop();
   character = new AcsCharacter(data);
   player = new AcsPlayer(character, canvas);
-  player.soundEnabled = soundCheck.checked;
+  player.soundEnabled = soundOn;
   const rest = character.animations.get("RestPose") ?? character.animations.values().next().value;
   if (rest?.frames[0]) player.draw(rest.frames[0]);
   status.textContent = name;
@@ -170,8 +181,13 @@ fileInput.addEventListener("change", () => {
   const f = fileInput.files?.[0];
   if (f) void pickFile(f);
 });
-soundCheck.addEventListener("change", () => {
-  if (player) player.soundEnabled = soundCheck.checked;
+soundButton.addEventListener("click", () => {
+  soundOn = !soundOn;
+  renderSoundButton();
+  if (player) player.soundEnabled = soundOn;
+  try {
+    localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
+  } catch { /* ignore */ }
 });
 
 void Office.onReady(async (info) => {
