@@ -1,5 +1,6 @@
 import { AcsPlayer } from "./acs/player";
 import { AcsCharacter } from "./acs/reader";
+import { buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -10,6 +11,8 @@ const selectionBox = $("selection");
 const selectionInfo = $("selection-info");
 const animSelect = $<HTMLSelectElement>("animations");
 const playButton = $<HTMLButtonElement>("play");
+const queryInput = $<HTMLInputElement>("query");
+const engineSelect = $<HTMLSelectElement>("engine");
 const fileInput = $<HTMLInputElement>("file");
 const soundCheck = $<HTMLInputElement>("sound");
 
@@ -76,6 +79,40 @@ function onSelectionChanged() {
     playRandom();
   }
 }
+
+// --- ウェブ検索 (検索エンジンの URL をブラウザで開く) ---
+const ENGINE_KEY = "officeagent.engine";
+engineSelect.replaceChildren(...SEARCH_ENGINES.map((e, i) => new Option(e.name, String(i))));
+try {
+  engineSelect.value = localStorage.getItem(ENGINE_KEY) ?? "0";
+} catch { /* 保存できない環境では既定のまま */ }
+engineSelect.addEventListener("change", () => {
+  try {
+    localStorage.setItem(ENGINE_KEY, engineSelect.value);
+  } catch { /* ignore */ }
+});
+
+/** 検索中らしいアニメーションがあればそれを、なければ何もしない */
+function playSearching() {
+  const name = ["Searching", "Thinking", "Processing"].find((n) => character?.animations.has(n));
+  if (name) void player?.play(name);
+}
+
+function runSearch() {
+  const text = queryInput.value.trim();
+  const engine = SEARCH_ENGINES[Number(engineSelect.value)];
+  if (!text || !engine) return;
+  playSearching();
+  // ユーザー操作の直後に開く (ポップアップブロック回避)
+  const win = window.open(buildSearchUrl(engine, text), "_blank");
+  if (win) win.opener = null;
+  else status.textContent = "ブラウザに検索ページを開くのをブロックされました。許可してください。";
+}
+
+$("search").addEventListener("click", runSearch);
+queryInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.isComposing) runSearch();
+});
 
 canvas.addEventListener("click", playRandom);
 playButton.addEventListener("click", () => void player?.play(animSelect.value));
