@@ -38,6 +38,16 @@ npm run validate                     # manifest.xml の検証
 ペインを開くと、キャラクターは最初は見えない状態から、`Greeting`（無いキャラクターは `Show`）のアニメーションで登場します（効果音は、ブラウザの制限で、ペインを一度クリックするまで鳴りません）。
 `.acs` は再配布できないので、ペインの「キャラクターを選ぶ」で 1 回選ぶと IndexedDB に保存され、次回から自動で読み込まれます。
 
+## 本番公開 (GitHub Pages)
+
+master に push すると、GitHub Actions（`.github/workflows/deploy.yml`）が自動でビルドして GitHub Pages に公開します。
+
+- 公開先: `https://<ユーザー名>.github.io/OfficeAgent-Web/`
+- 本番用のマニフェスト: `https://<ユーザー名>.github.io/OfficeAgent-Web/manifest.xml`（`manifest.xml` の localhost を公開先の URL に置き換えたもの。`npm run build:pages` が `dist/manifest.xml` に生成します）
+- 本番用のアドイン ID は、開発用とは別にしてあるので、両方を同じ Office に入れても衝突しません。
+- 初回だけ、リポジトリの Settings > Pages > Source を「GitHub Actions」にします。
+- ローカルで本番ビルドを試す: `SITE_URL=https://<ユーザー名>.github.io/OfficeAgent-Web npm run build:pages`
+
 ## ウェブ検索
 
 吹き出しに入力して [検索(S)]（Enter / Alt+S。Enter で検索すると入力欄のフォーカスが外れます）で、選んだ検索エンジンで検索し、結果を作業ウィンドウ内に表示します。

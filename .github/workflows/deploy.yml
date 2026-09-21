@@ -1,0 +1,46 @@
+name: Deploy to GitHub Pages
+
+# master に push するたびに、ビルドして GitHub Pages に公開する。
+# 事前に、リポジトリの Settings > Pages > Build and deployment > Source を「GitHub Actions」にしておくこと。
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時に複数のデプロイが走らないようにする (新しいものを優先)
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # 型チェック → ビルド (/OfficeAgent-Web/ 配下) → 本番用 manifest.xml を dist/ に生成
+      - run: npm run build:pages
+        env:
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

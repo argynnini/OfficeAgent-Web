@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "dump": "tsx scripts/dump.ts",
     "icons": "tsx scripts/make-icons.ts",
-    "validate": "office-addin-manifest validate manifest.xml"
+    "validate": "office-addin-manifest validate manifest.xml",
+    "build:pages": "tsc && vite build --base=/OfficeAgent-Web/ && tsx scripts/make-manifest.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
