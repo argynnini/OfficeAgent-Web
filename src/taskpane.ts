@@ -37,6 +37,14 @@ const SKIP = /^(Idle|RestPose|Show|Hide|GoodBye|Greet)/i;
 
 let lastAnimation: string | undefined;
 
+/** 再生中は ■ (クリックで停止)、待機中は ▶ */
+function renderPlayButton(playing: boolean) {
+  playButton.dataset.playing = String(playing);
+  playButton.title = playing
+    ? "停止\nクリックでアニメーションを止めて待機ポーズに戻します。"
+    : "アニメーションを再生\nマウスを載せると一覧から選べます。";
+}
+
 function playAnimation(name: string) {
   lastAnimation = name;
   void player?.play(name);
@@ -54,6 +62,8 @@ function useCharacter(data: ArrayBuffer, name: string) {
   character = new AcsCharacter(data);
   player = new AcsPlayer(character, canvas);
   player.soundEnabled = soundOn;
+  player.onPlayingChange = renderPlayButton;
+  renderPlayButton(false);
   const rest = character.animations.get("RestPose") ?? character.animations.values().next().value;
   if (rest?.frames[0]) player.draw(rest.frames[0]);
   status.textContent = name;
@@ -194,8 +204,17 @@ queryInput.addEventListener("keydown", (e) => {
 
 // カイル君をクリックするとランダムにアニメーション
 canvas.addEventListener("click", playRandom);
-// 再生ボタン: 直前に選んだアニメーションをもう一度 (未選択ならランダム)
-playButton.addEventListener("click", () => (lastAnimation ? playAnimation(lastAnimation) : playRandom()));
+// 再生ボタン: 再生中はクリックで停止して待機ポーズへ。待機中は直前のアニメーションをもう一度 (未選択ならランダム)
+playButton.addEventListener("click", () => {
+  if (player?.isPlaying) {
+    player.stop();
+    drawRest();
+  } else if (lastAnimation) {
+    playAnimation(lastAnimation);
+  } else {
+    playRandom();
+  }
+});
 $("pick").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => {
   const f = fileInput.files?.[0];
