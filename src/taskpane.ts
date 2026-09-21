@@ -92,43 +92,50 @@ engineSelect.addEventListener("change", () => {
   } catch { /* ignore */ }
 });
 
-/** 検索実行時は考え中のアニメーション。なければ何もしない */
-function playSearching() {
-  const name = ["Thinking", "Processing"].find((n) => character?.animations.has(n));
-  if (name) void player?.play(name);
-}
-
-// --- 入力中は Writing を再生し、入力が止まったら待機ポーズに戻す ---
-const TYPING_IDLE_MS = 1500;
-let typingPlaying = false;
-let typingTimer: number | undefined;
-
 function drawRest() {
   const rest = character?.animations.get("RestPose")?.frames[0];
   if (rest) player?.draw(rest);
 }
 
-queryInput.addEventListener("input", () => {
-  window.clearTimeout(typingTimer);
-  if (!typingPlaying) {
-    typingPlaying = true;
-    const name = ["Writing", "Write"].find((n) => character?.animations.has(n));
-    if (name && player) void player.play(name).finally(() => (typingPlaying = false));
-    else typingPlaying = false;
-  }
-  typingTimer = window.setTimeout(() => {
-    player?.stop();
-    typingPlaying = false;
-    drawRest();
-  }, TYPING_IDLE_MS);
+const firstAnimation = (...names: string[]) => names.find((n) => character?.animations.has(n));
+
+// --- 検索ボックスにフォーカス中は Writing を繰り返し、外れたら止めて待機ポーズに戻す ---
+let focused = false;
+/** 検索実行の Thinking 再生中は Writing を止めておく */
+let thinking = false;
+
+function playWriting() {
+  const name = firstAnimation("Writing", "Write");
+  if (!focused || thinking || !name || !player) return;
+  void player.play(name).then(playWriting);
+}
+
+queryInput.addEventListener("focus", () => {
+  focused = true;
+  playWriting();
+});
+queryInput.addEventListener("blur", () => {
+  focused = false;
+  player?.stop();
+  drawRest();
 });
 
+/** 検索実行時は Thinking を 1 回再生し、終わったらフォーカス中なら Writing に戻る */
+function playThinking() {
+  const name = firstAnimation("Thinking", "Processing");
+  if (!name || !player) return;
+  thinking = true;
+  void player.play(name).then(() => {
+    thinking = false;
+    playWriting();
+  });
+}
+
 function runSearch() {
-  window.clearTimeout(typingTimer);
   const text = queryInput.value.trim();
   const engine = SEARCH_ENGINES[Number(engineSelect.value)];
   if (!text || !engine) return;
-  playSearching();
+  playThinking();
   // ユーザー操作の直後に開く (ポップアップブロック回避)
   const win = window.open(buildSearchUrl(engine, text), "_blank");
   if (win) win.opener = null;
