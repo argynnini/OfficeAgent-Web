@@ -7,6 +7,9 @@ const canvas = $<HTMLCanvasElement>("stage");
 const status = $("status");
 const hostLabel = $("host");
 const selectionBox = $("selection");
+const selectionInfo = $("selection-info");
+const animSelect = $<HTMLSelectElement>("animations");
+const playButton = $<HTMLButtonElement>("play");
 const fileInput = $<HTMLInputElement>("file");
 const soundCheck = $<HTMLInputElement>("sound");
 
@@ -33,6 +36,10 @@ function useCharacter(data: ArrayBuffer, name: string) {
   const rest = character.animations.get("RestPose") ?? character.animations.values().next().value;
   if (rest?.frames[0]) player.draw(rest.frames[0]);
   status.textContent = name;
+
+  const names = [...character.animations.keys()].sort();
+  animSelect.replaceChildren(...names.map((n) => new Option(n, n)));
+  animSelect.disabled = playButton.disabled = false;
 }
 
 async function pickFile(file: File) {
@@ -45,6 +52,8 @@ async function pickFile(file: File) {
   }
 }
 
+let eventCount = 0;
+
 function showSelection() {
   if (typeof Office === "undefined" || !Office.context?.document) return;
   Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (r) => {
@@ -54,10 +63,12 @@ function showSelection() {
     }
     const text = String(r.value ?? "");
     selectionBox.textContent = text || "(選択なし)";
+    selectionInfo.textContent = `選択変更イベント: ${eventCount} 回 / 取得した文字数: ${text.length}`;
   });
 }
 
 function onSelectionChanged() {
+  eventCount++;
   showSelection();
   const now = Date.now();
   if (now - lastAutoPlay > 4000) {
@@ -67,6 +78,8 @@ function onSelectionChanged() {
 }
 
 canvas.addEventListener("click", playRandom);
+playButton.addEventListener("click", () => void player?.play(animSelect.value));
+animSelect.addEventListener("change", () => void player?.play(animSelect.value));
 $("pick").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => {
   const f = fileInput.files?.[0];
@@ -80,7 +93,11 @@ void Office.onReady(async (info) => {
   hostLabel.textContent = info.host ? `Office: ${info.host} / ${info.platform}` : "ブラウザ単体で実行中 (Office 外)";
 
   if (info.host) {
-    Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged);
+    Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged, (r) => {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) {
+        selectionInfo.textContent = `選択変更イベントを登録できません: ${r.error.message}`;
+      }
+    });
     showSelection();
   }
 

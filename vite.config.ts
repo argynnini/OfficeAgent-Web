@@ -13,7 +13,8 @@ const https = existsSync(keyPath) && existsSync(certPath)
   : undefined;
 
 export default defineConfig({
-  server: { port: 3000, strictPort: true, https },
+  // localhost が IPv6 (::1) だけで待ち受けると、IPv4 で引く WebView から拒否されるので 127.0.0.1 に固定
+  server: { host: "127.0.0.1", port: 3000, strictPort: true, https },
   build: {
     rollupOptions: {
       input: {
