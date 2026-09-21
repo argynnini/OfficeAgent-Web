@@ -1,7 +1,7 @@
 # OfficeAgent-Web
 
 [OfficeAgent](https://github.com/argynnini/OfficeAgent)（VSTO 版カイル君）の Office.js アドイン版。
-Word / Excel / PowerPoint / Outlook の Web 版・Mac・モバイルにカイル君を登場させることを目指す実験的プロジェクト。
+Word / Excel / PowerPoint / Outlook の Web 版・Mac・モバイルにカイル君を登場させることを目指す実験的プロジェクト。  
 デスクトップアプリ(Windows)  
 <img width="800" alt="スクリーンショット 2026-09-21 171727" src="https://github.com/user-attachments/assets/7a4ff699-bfe5-46ca-b951-305a750ed8b5" />
 
