@@ -83,7 +83,9 @@
       /* 再生ボタン: 待機中は ▶、再生中は ■ */
       #play[data-playing="false"] .stop-icon, #play[data-playing="true"] .play-icon { display: none; }
       /* 絵文字のアイコン (OS の絵文字フォントで表示される) */
-      .icon-btn .emoji { font: 16px/1 "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; opacity: 0.7; }
+      /* 絵文字は、色を完全には消さず、目立たない程度に彩度を落として薄くする (ホバーで少し戻る) */
+      .icon-btn .emoji { font: 16px/1 "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; filter: saturate(0.35); opacity: 0.7; transition: filter 0.12s ease, opacity 0.12s ease; }
+      .icon-btn:hover .emoji { filter: saturate(0.75); opacity: 0.95; }
       /* ボタン: カイル君の左 (ペインの左端) にキャラクター読み込み、右 (ペインの右端) に効果音・再生。どちらも足元に揃える */
       .side-left { grid-column: 1; justify-self: start; align-self: end; padding-bottom: 6px; }
       .side { grid-column: 3; justify-self: end; align-self: end; padding-bottom: 6px; }
