@@ -5,6 +5,7 @@ const fileInput = document.getElementById("file") as HTMLInputElement;
 const select = document.getElementById("animations") as HTMLSelectElement;
 const playButton = document.getElementById("play") as HTMLButtonElement;
 const status = document.getElementById("status") as HTMLElement;
+const soundCheck = document.getElementById("sound") as HTMLInputElement;
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
 
 let player: AcsPlayer | undefined;
@@ -15,6 +16,7 @@ async function load(file: File) {
     const character = new AcsCharacter(await file.arrayBuffer());
     player?.stop();
     player = new AcsPlayer(character, canvas);
+    player.soundEnabled = soundCheck.checked;
 
     const names = [...character.animations.keys()].sort();
     select.replaceChildren(...names.map((n) => new Option(n, n)));
@@ -31,6 +33,9 @@ async function load(file: File) {
 fileInput.addEventListener("change", () => {
   const file = fileInput.files?.[0];
   if (file) void load(file);
+});
+soundCheck.addEventListener("change", () => {
+  if (player) player.soundEnabled = soundCheck.checked;
 });
 playButton.addEventListener("click", () => void player?.play(select.value));
 select.addEventListener("change", () => void player?.play(select.value));

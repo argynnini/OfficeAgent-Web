@@ -90,6 +90,7 @@ export class AcsCharacter {
   readonly animations = new Map<string, Animation>();
 
   private readonly imageLocations: Location[] = [];
+  private readonly soundLocations: Location[] = [];
   private readonly imageCache = new Map<number, AcsImage>();
 
   constructor(private readonly buf: ArrayBuffer) {
@@ -98,7 +99,7 @@ export class AcsCharacter {
     const charLoc = c.location();
     const animLoc = c.location();
     const imageLoc = c.location();
-    // 音声 (audioLoc) は今回のプロトタイプでは扱わない
+    const audioLoc = c.location();
 
     // --- キャラクター情報 ---
     c.pos = charLoc.offset;
@@ -137,6 +138,14 @@ export class AcsCharacter {
     const imageCount = c.u32();
     for (let i = 0; i < imageCount; i++) {
       this.imageLocations.push(c.location());
+      c.skip(4); // checksum
+    }
+
+    // --- 効果音一覧 ---
+    c.pos = audioLoc.offset;
+    const soundCount = c.u32();
+    for (let i = 0; i < soundCount; i++) {
+      this.soundLocations.push(c.location());
       c.skip(4); // checksum
     }
 
@@ -195,6 +204,12 @@ export class AcsCharacter {
 
   get imageCount() {
     return this.imageLocations.length;
+  }
+
+  /** 効果音 (WAV) の生データ。存在しなければ undefined */
+  getSound(index: number): Uint8Array | undefined {
+    const loc = this.soundLocations[index];
+    return loc && new Uint8Array(this.buf, loc.offset, loc.size);
   }
 
   getImage(index: number): AcsImage {

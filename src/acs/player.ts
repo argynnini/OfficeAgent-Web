@@ -4,6 +4,10 @@ import type { AcsCharacter, Animation, Frame } from "./reader";
 export class AcsPlayer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly sprites = new Map<number, HTMLCanvasElement>();
+  /** 効果音を鳴らすか (ブラウザの自動再生制限のため、ユーザー操作後に有効) */
+  soundEnabled = true;
+  private audioCtx: AudioContext | undefined;
+  private readonly buffers = new Map<number, Promise<AudioBuffer | undefined>>();
   private timer: number | undefined;
   /** 再生要求ごとに増やし、古い再生ループを無効化する */
   private token = 0;
@@ -46,6 +50,7 @@ export class AcsPlayer {
         const frame = anim.frames[index];
         if (!frame) return resolve();
         this.draw(frame);
+        if (frame.soundIndex >= 0) void this.playSound(frame.soundIndex);
         const next = this.nextIndex(frame, index);
         this.timer = window.setTimeout(() => step(next), Math.max(frame.duration, 10));
       };
@@ -61,6 +66,25 @@ export class AcsPlayer {
       roll -= b.probability;
     }
     return index + 1;
+  }
+
+  private async playSound(index: number) {
+    if (!this.soundEnabled) return;
+    this.audioCtx ??= new AudioContext();
+    const ctx = this.audioCtx;
+    if (ctx.state === "suspended") await ctx.resume().catch(() => undefined);
+    let buffer = this.buffers.get(index);
+    if (!buffer) {
+      const wav = this.character.getSound(index);
+      buffer = wav ? ctx.decodeAudioData(wav.slice().buffer).catch(() => undefined) : Promise.resolve(undefined);
+      this.buffers.set(index, buffer);
+    }
+    const decoded = await buffer;
+    if (!decoded) return;
+    const src = ctx.createBufferSource();
+    src.buffer = decoded;
+    src.connect(ctx.destination);
+    src.start();
   }
 
   private sprite(index: number): HTMLCanvasElement {
