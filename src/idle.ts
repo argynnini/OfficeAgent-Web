@@ -4,8 +4,8 @@ import type { AcsCharacter } from "./acs/reader";
 /** 待機中 (放置中) に再生する動きの名前。Merlin: Idle1_1 など / クリッピー: IdleSnooze など / イルカ: Idle(3), DeepIdle1 */
 const IDLE_NAME = /^(Idle|DeepIdle)/i;
 
-const FIRST_IDLE_MIN_MS = 8_000;
-const FIRST_IDLE_SPAN_MS = 8_000;
+const FIRST_IDLE_MIN_MS = 4_000;
+const FIRST_IDLE_SPAN_MS = 4_000;
 /** 放置がこの時間ごとに、より深い (大きな) 待機動作が出るようになる */
 const ESCALATE_MS = 40_000;
 const MAX_LEVEL = 3;
