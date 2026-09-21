@@ -13,6 +13,8 @@
       #stage { display: block; cursor: pointer; }
       /* カイル君の右に、キャラ選択と効果音を縦に並べる */
       .stage-row { display: flex; align-items: flex-end; justify-content: center; gap: 12px; }
+      .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; background: #fff; border: 1px solid #999; border-radius: 4px; cursor: pointer; }
+      .icon-btn:hover { background: #f0f0f0; border-color: #666; }
       .side { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-bottom: 8px; font-size: 12px; }
       .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
       .muted { color: #888; }
@@ -110,7 +112,9 @@
         <canvas id="stage" width="128" height="128" title="クリックでアニメーション"></canvas>
         <div class="side">
           <input id="file" type="file" accept=".acs" hidden />
-          <button id="pick" type="button">キャラを選ぶ (.acs)</button>
+          <button id="pick" type="button" class="icon-btn" title="キャラクターを選ぶ&#10;.acs ファイル (Microsoft Agent のキャラクター) を読み込みます。&#10;一度選ぶと、次回から自動で読み込みます。" aria-label="キャラクターを選ぶ">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z" fill="#f5c542" stroke="#8a6d1a" stroke-width="1.3" stroke-linejoin="round"/><path d="M3 10.5h18" stroke="#8a6d1a" stroke-width="1.3"/></svg>
+          </button>
           <label><input id="sound" type="checkbox" checked /> 効果音</label>
         </div>
       </div>
