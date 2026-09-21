@@ -30,9 +30,6 @@ renderSoundButton();
 
 let player: AcsPlayer | undefined;
 let character: AcsCharacter | undefined;
-/** 選択変更などで連続再生しないための間引き */
-let lastAutoPlay = 0;
-
 /** 自動再生に向かない (待機・登場・退場) アニメーションを除く */
 const SKIP = /^(Idle|RestPose|Show|Hide|GoodBye|Greet)/i;
 
@@ -127,11 +124,6 @@ function onSelectionChanged() {
   idle.userActivity();
   eventCount++;
   showSelection();
-  const now = Date.now();
-  if (now - lastAutoPlay > 4000) {
-    lastAutoPlay = now;
-    playRandom();
-  }
 }
 
 // --- ウェブ検索 (結果は作業ウィンドウ内に表示する) ---
