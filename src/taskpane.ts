@@ -134,12 +134,14 @@ function onSelectionChanged() {
   }
 }
 
-// --- ウェブ検索 (検索エンジンの URL をブラウザで開く) ---
+// --- ウェブ検索 (結果は作業ウィンドウ内に表示する) ---
 const ENGINE_KEY = "officeagent.engine";
-engineSelect.replaceChildren(...SEARCH_ENGINES.map((e, i) => new Option(e.embedPrefix ? e.name + "（ペイン内）" : e.name, String(i))));
+engineSelect.replaceChildren(...SEARCH_ENGINES.map((e) => new Option(e.name, e.name)));
 try {
-  engineSelect.value = localStorage.getItem(ENGINE_KEY) ?? "0";
+  // 保存しているのは検索エンジン名。以前の版の番号や、いまは無いエンジン名なら、先頭を選ぶ
+  engineSelect.value = localStorage.getItem(ENGINE_KEY) ?? "";
 } catch { /* 保存できない環境では既定のまま */ }
+if (engineSelect.selectedIndex < 0) engineSelect.selectedIndex = 0;
 engineSelect.addEventListener("change", () => {
   try {
     localStorage.setItem(ENGINE_KEY, engineSelect.value);
@@ -230,13 +232,11 @@ $("results-open").addEventListener("click", () => resultsExternalUrl && openExte
 
 function runSearch() {
   const text = queryInput.value.trim();
-  const engine = SEARCH_ENGINES[Number(engineSelect.value)];
+  const engine = SEARCH_ENGINES.find((e) => e.name === engineSelect.value);
   if (!text || !engine) return;
   playThinking();
 
-  const embedUrl = buildEmbedUrl(engine, text);
-  if (embedUrl) showResults(engine.name, embedUrl, buildSearchUrl(engine, text));
-  else openExternal(buildSearchUrl(engine, text));
+  showResults(engine.name, buildEmbedUrl(engine, text), buildSearchUrl(engine, text));
 }
 
 $("search").addEventListener("click", runSearch);
