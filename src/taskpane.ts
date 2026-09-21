@@ -360,7 +360,21 @@ soundButton.addEventListener("click", () => {
   } catch { /* ignore */ }
 });
 
+/**
+ * Office のテーマ (ダークモードなど) を、配色 (taskpane.html の data-theme) に反映する。
+ * ブラウザの prefers-color-scheme は、Office のテーマとは別の設定なので、取れるときは Office の値を優先する。
+ */
+function applyOfficeTheme() {
+  const bg = Office.context?.officeTheme?.bodyBackgroundColor;
+  const m = bg && /^#?([0-9a-f]{6})/i.exec(bg);
+  if (!m) return;
+  const n = parseInt(m[1]!, 16);
+  const luminance = (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 0xff) + 0.0722 * (n & 0xff)) / 255;
+  document.documentElement.dataset.theme = luminance < 0.5 ? "dark" : "light";
+}
+
 void Office.onReady(async (info) => {
+  if (info.host) applyOfficeTheme();
   if (info.host) {
     Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged, (r) => {
       if (r.status !== Office.AsyncResultStatus.Succeeded) {
