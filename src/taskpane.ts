@@ -285,17 +285,17 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)。
-// Tab は入力欄の中では、フォーカスを動かさない。入力欄が空で本文を選択中なら、選択範囲を挿入する (それ以外は何もしない)
-queryInput.addEventListener("keydown", (e) => {
-  if (e.key === "Tab" && !e.isComposing) {
-    e.preventDefault();
-    if (!e.shiftKey && suggestion && queryInput.value === "") {
-      queryInput.value = suggestion.slice(0, queryInput.maxLength);
-      queryInput.setSelectionRange(queryInput.value.length, queryInput.value.length);
-    }
-    return;
+// 入力欄での Tab は、taskpane.html の先頭の inline script が (Office.js より先に) 止めてフォーカスを動かさず、
+// Shift なしのときだけ "query-tab" を送ってくる。入力欄が空で本文を選択中なら、選択範囲を挿入する (それ以外は何もしない)
+queryInput.addEventListener("query-tab", () => {
+  if (suggestion && queryInput.value === "") {
+    queryInput.value = suggestion.slice(0, queryInput.maxLength);
+    queryInput.setSelectionRange(queryInput.value.length, queryInput.value.length);
   }
+});
+
+// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)
+queryInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
     runSearch();

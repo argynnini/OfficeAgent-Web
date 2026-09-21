@@ -4,6 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OfficeAgent</title>
+    <!--
+      吹き出しの入力欄で Tab を押してもフォーカスを動かさない。
+      Office.js などが、ページのコードより先に Tab を処理してフォーカスを動かすのを防ぐため、
+      Office.js の読み込みより前に、window の capture (最初に呼ばれる) で受けて伝播を止める。
+      選択範囲の挿入はページ側 (taskpane.ts) が "query-tab" イベントで受け取る。
+    -->
+    <script>
+      window.addEventListener(
+        "keydown",
+        function (e) {
+          var t = document.activeElement;
+          if (e.key !== "Tab" || !t || t.id !== "query" || e.isComposing) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if (!e.shiftKey) t.dispatchEvent(new CustomEvent("query-tab"));
+        },
+        true
+      );
+    </script>
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <style>
       html { height: 100%; }
