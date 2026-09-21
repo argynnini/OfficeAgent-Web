@@ -1,5 +1,6 @@
 import { AcsPlayer } from "./acs/player";
 import { AcsCharacter } from "./acs/reader";
+import { IdleController } from "./idle";
 import { buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
 
@@ -62,7 +63,10 @@ function useCharacter(data: ArrayBuffer, name: string) {
   character = new AcsCharacter(data);
   player = new AcsPlayer(character, canvas);
   player.soundEnabled = soundOn;
-  player.onPlayingChange = renderPlayButton;
+  player.onPlayingChange = (playing) => {
+    renderPlayButton(playing);
+    if (!playing) idle.animationEnded();
+  };
   renderPlayButton(false);
   const rest = character.animations.get("RestPose") ?? character.animations.values().next().value;
   if (rest?.frames[0]) player.draw(rest.frames[0]);
@@ -111,6 +115,7 @@ function showSelection() {
 }
 
 function onSelectionChanged() {
+  idle.userActivity();
   eventCount++;
   showSelection();
   const now = Date.now();
@@ -152,7 +157,8 @@ function playWriting() {
 
 queryInput.addEventListener("focus", () => {
   focused = true;
-  playWriting();
+  // 待機動作中なら、終了分岐で自然に終わらせてから Writing へ
+  void idle.interrupt().then(playWriting);
 });
 queryInput.addEventListener("blur", () => {
   focused = false;
@@ -162,6 +168,15 @@ queryInput.addEventListener("blur", () => {
     if (!focused && !thinking && !player?.isPlaying) drawRest();
   });
 });
+
+// --- 待機動作: 放置するとときどき Idle 系を再生する (放置が長いほど深い動き) ---
+const idle = new IdleController({
+  player: () => player,
+  character: () => character,
+  busy: () => focused || thinking,
+});
+idle.start();
+for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => idle.userActivity());
 
 /** 検索実行時は Thinking を 1 回再生し、終わったらフォーカス中なら Writing に戻る */
 function playThinking() {
