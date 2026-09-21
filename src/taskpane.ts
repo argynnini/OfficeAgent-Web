@@ -9,7 +9,7 @@ const status = $("status");
 const hostLabel = $("host");
 const selectionBox = $("selection");
 const selectionInfo = $("selection-info");
-const animSelect = $<HTMLSelectElement>("animations");
+const flyout = $("flyout");
 const playButton = $<HTMLButtonElement>("play");
 const queryInput = $<HTMLTextAreaElement>("query");
 const engineSelect = $<HTMLSelectElement>("engine");
@@ -35,6 +35,13 @@ let lastAutoPlay = 0;
 /** 自動再生に向かない (待機・登場・退場) アニメーションを除く */
 const SKIP = /^(Idle|RestPose|Show|Hide|GoodBye|Greet)/i;
 
+let lastAnimation: string | undefined;
+
+function playAnimation(name: string) {
+  lastAnimation = name;
+  void player?.play(name);
+}
+
 function playRandom() {
   if (!player || !character) return;
   const names = [...character.animations.keys()].filter((n) => !SKIP.test(n));
@@ -52,8 +59,20 @@ function useCharacter(data: ArrayBuffer, name: string) {
   status.textContent = name;
 
   const names = [...character.animations.keys()].sort();
-  animSelect.replaceChildren(...names.map((n) => new Option(n, n)));
-  animSelect.disabled = playButton.disabled = false;
+  flyout.replaceChildren(
+    ...names.map((n) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.role = "menuitem";
+      item.textContent = n;
+      item.addEventListener("click", () => {
+        playAnimation(n);
+        // フォーカスを外してマウスが離れたらメニューが閉じるようにする
+        (document.activeElement as HTMLElement | null)?.blur();
+      });
+      return item;
+    }),
+  );
 }
 
 async function pickFile(file: File) {
@@ -129,7 +148,8 @@ queryInput.addEventListener("blur", () => {
   focused = false;
   // 途中で切らず、Writing の終了分岐 (書くのをやめる動き) を最後まで再生してから待機ポーズへ
   void player?.release().then(() => {
-    if (!focused && !thinking) drawRest();
+    // 別のアニメーション (メニュー選択など) が始まっていれば待機ポーズで上書きしない
+    if (!focused && !thinking && !player?.isPlaying) drawRest();
   });
 });
 
@@ -174,8 +194,8 @@ queryInput.addEventListener("keydown", (e) => {
 
 // カイル君をクリックするとランダムにアニメーション
 canvas.addEventListener("click", playRandom);
-playButton.addEventListener("click", () => void player?.play(animSelect.value));
-animSelect.addEventListener("change", () => void player?.play(animSelect.value));
+// 再生ボタン: 直前に選んだアニメーションをもう一度 (未選択ならランダム)
+playButton.addEventListener("click", () => (lastAnimation ? playAnimation(lastAnimation) : playRandom()));
 $("pick").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => {
   const f = fileInput.files?.[0];
