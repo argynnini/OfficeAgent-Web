@@ -40,12 +40,13 @@
         display: block;
         width: 100%;
         box-sizing: border-box;
-        height: 44px;
         padding: 2px 4px;
         border: 1px solid #000;
         background: #fff;
         color: #000;
-        font: 13px "MS UI Gothic", "Yu Gothic UI", sans-serif;
+        font: 13px/1.3 "MS UI Gothic", "Yu Gothic UI", sans-serif;
+        /* ちょうど 2 行分: 行高 1.3em x 2 + 上下 padding 4px + 枠 2px */
+        height: calc(2.6em + 6px);
         resize: none;
       }
       .balloon textarea::placeholder { color: #a0a0a0; opacity: 1; }
