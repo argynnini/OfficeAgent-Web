@@ -3,6 +3,16 @@
 [OfficeAgent](https://github.com/argynnini/OfficeAgent)（VSTO 版カイル君）の Office.js アドイン版。
 Word / Excel / PowerPoint / Outlook の Web 版・Mac・モバイルにカイル君を登場させることを目指す実験的プロジェクト。
 
+## キャラクターファイル (.acs) の入手
+
+このリポジトリには、キャラクターファイル（`.acs`）は含まれていません（Microsoft のキャラクターで、再配布できないためです）。
+次のどちらかの方法で、自分で入手してください。
+
+- **Microsoft Office 2000 / XP (2001) / 2003 から入手する**（Office に付属していた Office アシスタントのキャラクター）
+- **[Agentpedia](https://agentpedia.tmafe.com/) などから入手する**
+
+入手した `.acs` は、ペイン左下の 🐬 ボタンから 1 回だけ選びます。選んだファイルはブラウザの中（IndexedDB）に保存され、次回から自動で読み込まれます。ファイルがサーバーに送られることはありません。
+
 ## 方針
 
 - タスクペイン内にカイル君を常駐させる（デスクトップ版のように画面を歩き回ることは Office.js では不可）
@@ -18,8 +28,8 @@ npm run dump -- path/to/Merlin.acs                      # 解析結果と全画�
 npx tsx scripts/render.ts path/to/Merlin.acs RestPose out.png   # 先頭フレームを PNG 出力
 ```
 
-現状: ACS のパース（キャラクター情報・アニメーション・画像）、独自圧縮の展開、canvas での再生（分岐あり）まで。
-未対応: 口パク（overlay）、サウンド、終了分岐、状態（States）。
+現状: ACS のパース（キャラクター情報・アニメーション・画像・効果音）、独自圧縮と ADPCM の展開、canvas での再生（分岐・終了分岐あり）まで。
+未対応: 口パク（overlay）、状態（States）。
 
 ## Office に読み込む（開発用サイドロード）
 
