@@ -74,7 +74,3 @@ master に push すると、GitHub Actions（`.github/workflows/deploy.yml`）�
 3. 選択範囲の要約・翻訳・解説・誤字脱字チェック
 4. Excel シート追加や選択変更などのイベント連動アニメ
 5. Web Speech API によるノート読み上げ
-
-## 注意
-
-`.acs`（Microsoft Agent キャラクター）は再配布可否を確認するまでリポジトリに含めない。
