@@ -1,3 +1,4 @@
+import { decodeWav } from "./wav";
 import type { AcsCharacter, Animation, Frame } from "./reader";
 
 /** ACS キャラクターのアニメーションを canvas に再生する */
@@ -7,7 +8,7 @@ export class AcsPlayer {
   /** 効果音を鳴らすか (ブラウザの自動再生制限のため、ユーザー操作後に有効) */
   soundEnabled = true;
   private audioCtx: AudioContext | undefined;
-  private readonly buffers = new Map<number, Promise<AudioBuffer | undefined>>();
+  private readonly buffers = new Map<number, AudioBuffer | null>();
   private timer: number | undefined;
   /** 再生要求ごとに増やし、古い再生ループを無効化する */
   private token = 0;
@@ -73,13 +74,16 @@ export class AcsPlayer {
     this.audioCtx ??= new AudioContext();
     const ctx = this.audioCtx;
     if (ctx.state === "suspended") await ctx.resume().catch(() => undefined);
-    let buffer = this.buffers.get(index);
-    if (!buffer) {
+    let decoded = this.buffers.get(index);
+    if (decoded === undefined) {
       const wav = this.character.getSound(index);
-      buffer = wav ? ctx.decodeAudioData(wav.slice().buffer).catch(() => undefined) : Promise.resolve(undefined);
-      this.buffers.set(index, buffer);
+      const pcm = wav && decodeWav(wav);
+      if (pcm) {
+        decoded = ctx.createBuffer(1, pcm.samples.length, pcm.sampleRate);
+        decoded.copyToChannel(pcm.samples, 0);
+      }
+      this.buffers.set(index, decoded ?? null);
     }
-    const decoded = await buffer;
     if (!decoded) return;
     const src = ctx.createBufferSource();
     src.buffer = decoded;
