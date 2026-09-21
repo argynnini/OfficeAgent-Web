@@ -145,6 +145,14 @@ function runSearch() {
 }
 
 $("search").addEventListener("click", runSearch);
+// VSTO 版の「検索(&S)」と同じく Alt+S で検索 (ペインにフォーカスがあるときのみ)
+document.addEventListener("keydown", (e) => {
+  if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    runSearch();
+  }
+});
+
 // VSTO 版と同じく Enter で検索 (Shift+Enter で改行)
 queryInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
