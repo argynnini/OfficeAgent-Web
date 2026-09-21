@@ -6,8 +6,8 @@ const IDLE_NAME = /^(Idle|DeepIdle)/i;
 
 const FIRST_IDLE_MIN_MS = 4_000;
 const FIRST_IDLE_SPAN_MS = 4_000;
-/** 放置がこの時間ごとに、より深い (大きな) 待機動作が出るようになる */
-const ESCALATE_MS = 40_000;
+/** 放置がこの時間ごとに、より深い (大きな) 待機動作が出るようになる。3 段階なので放置 30 秒で最深に達する */
+const ESCALATE_MS = 15_000;
 const MAX_LEVEL = 3;
 /** 浅い待機動作がだらだら続かないよう、この時間で終わらせる (居眠りなど最深の動きは触られるまで続ける) */
 const MAX_SHALLOW_IDLE_MS = 25_000;
@@ -24,12 +24,18 @@ export function idleLevel(name: string): number {
   return 1;
 }
 
-/** maxLevel 以下の待機動作からランダムに 1 つ選ぶ。直前と同じものは、他に候補があれば避ける */
+/** maxLevel 以下の待機動作から 1 つ選ぶ。深い段階ほど選ばれやすい (重み = 段階の 2 乗)。直前と同じものは、他に候補があれば避ける */
 export function pickIdle(names: Iterable<string>, maxLevel: number, last?: string, random = Math.random): string | undefined {
   const pool = [...names].filter((n) => IDLE_NAME.test(n) && idleLevel(n) <= maxLevel);
   const fresh = pool.filter((n) => n !== last);
   const src = fresh.length > 0 ? fresh : pool;
-  return src[Math.floor(random() * src.length)];
+  const weights = src.map((n) => idleLevel(n) ** 2);
+  let roll = random() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < src.length; i++) {
+    roll -= weights[i]!;
+    if (roll < 0) return src[i];
+  }
+  return src[src.length - 1];
 }
 
 export interface IdleDeps {
