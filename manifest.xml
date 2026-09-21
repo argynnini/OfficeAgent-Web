@@ -145,7 +145,7 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Group.Label" DefaultValue="OfficeAgent"/>
-        <bt:String id="Button.Label" DefaultValue="呼び出す"/>
+        <bt:String id="Button.Label" DefaultValue="表示"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="Button.Tip" DefaultValue="作業ウィンドウに OfficeAgent を表示します。"/>

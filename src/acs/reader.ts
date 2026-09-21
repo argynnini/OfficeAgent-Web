@@ -85,6 +85,8 @@ export class AcsCharacter {
   readonly width: number;
   readonly height: number;
   readonly transparentIndex: number;
+  /** キャラクター名 (ACS に埋め込まれた名前。日本語 → 英語 → 先頭の言語の順。読めなければ undefined) */
+  readonly name: string | undefined;
   /** [r, g, b] の配列 */
   readonly palette: [number, number, number][] = [];
   readonly animations = new Map<string, Animation>();
@@ -104,7 +106,7 @@ export class AcsCharacter {
     // --- キャラクター情報 ---
     c.pos = charLoc.offset;
     c.skip(4); // version
-    c.skip(8); // localized info location
+    const localizedLoc = c.location();
     c.skip(16); // GUID
     this.width = c.u16();
     this.height = c.u16();
@@ -126,6 +128,8 @@ export class AcsCharacter {
       c.string(); // font name
       c.skip(4 + 2 + 4); // height / weight / italic / unknown など
     }
+    this.name = this.readName(localizedLoc);
+
     const colorCount = c.u32();
     for (let i = 0; i < colorCount; i++) {
       const b = c.u8(), g = c.u8(), r = c.u8();
@@ -160,6 +164,26 @@ export class AcsCharacter {
     }
     for (const e of entries) {
       this.animations.set(e.name, this.readAnimation(e.loc));
+    }
+  }
+
+  /** 多言語のキャラクター情報から名前を取り出す */
+  private readName(loc: Location): string | undefined {
+    try {
+      const c = new Cursor(this.buf, loc.offset);
+      const count = c.u16();
+      const names = new Map<number, string>();
+      for (let i = 0; i < count; i++) {
+        const lang = c.u16();
+        const name = c.string();
+        c.string(); // description
+        c.string(); // extra
+        names.set(lang, name);
+      }
+      const JAPANESE = 0x411, ENGLISH = 0x9;
+      return names.get(JAPANESE) || names.get(ENGLISH) || names.values().next().value || undefined;
+    } catch {
+      return undefined;
     }
   }
 

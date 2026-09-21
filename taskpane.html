@@ -31,8 +31,9 @@
       .side { grid-column: 3; justify-self: end; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-bottom: 8px; }
       .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
       .muted { color: #888; }
+      .status { text-align: center; margin-top: 6px; font-size: 14px; font-weight: 600; color: #888; }
       #selection { color: #555; margin-top: 12px; padding: 8px; background: #f4f4f4; border-radius: 4px; white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow: auto; }
-      #host { text-align: center; margin-bottom: 4px; }
+      #host { text-align: center; margin-top: 8px; font-size: 11px; }
 
       /*
        * 検索吹き出し。VSTO 版 SearchBalloonForm と同じ配色・寸法:
@@ -99,11 +100,6 @@
     </style>
   </head>
   <body>
-    <div id="host" class="muted"></div>
-    <div id="status" class="muted" style="text-align:center;margin-top:8px"></div>
-    <div id="selection" class="muted">選択範囲がここに表示されます</div>
-    <div id="selection-info" class="muted" style="margin-top:4px;font-size:11px"></div>
-
     <div id="dock">
       <div class="balloon">
         <div class="title">何について調べますか？</div>
@@ -143,6 +139,12 @@
           </div>
         </div>
       </div>
+
+      <!-- カイル君の下: キャラクター名 / 状態、選択範囲、ホスト情報 -->
+      <div id="status" class="status"></div>
+      <div id="selection" class="muted">選択範囲がここに表示されます</div>
+      <div id="selection-info" class="muted" style="margin-top:4px;font-size:11px"></div>
+      <div id="host" class="muted"></div>
     </div>
     <script type="module" src="/src/taskpane.ts"></script>
   </body>

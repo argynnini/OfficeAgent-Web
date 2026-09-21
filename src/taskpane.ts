@@ -76,7 +76,8 @@ function useCharacter(data: ArrayBuffer, name: string) {
   idle.userActivity();
   const rest = character.animations.get("RestPose") ?? character.animations.values().next().value;
   if (rest?.frames[0]) player.draw(rest.frames[0]);
-  status.textContent = name;
+  // キャラクター名 (ACS に埋め込まれた名前。読めなければファイル名から拡張子を除いたもの)
+  status.textContent = character.name || name.replace(/\.[^.]+$/, "");
 
   const names = [...character.animations.keys()].sort();
   flyout.replaceChildren(
