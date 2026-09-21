@@ -110,13 +110,16 @@ let eventCount = 0;
 // --- 本文の選択範囲を、吹き出しのプレースホルダーに薄く表示し、Tab で挿入できるようにする ---
 const DEFAULT_PLACEHOLDER = queryInput.placeholder;
 const PLACEHOLDER_MAX_CHARS = 120;
+/** 候補の先頭に付ける操作の案内 (長い候補で切れないよう先頭に置く) */
+const SUGGESTION_HINT = "[Tab]で挿入: ";
 /** 本文で選択中のテキスト (なければ空) */
 let suggestion = "";
 
 function setSuggestion(text: string) {
   suggestion = text.trim();
   const flat = suggestion.replace(/\s+/g, " ");
-  queryInput.placeholder = !flat ? DEFAULT_PLACEHOLDER : flat.length > PLACEHOLDER_MAX_CHARS ? flat.slice(0, PLACEHOLDER_MAX_CHARS) + "…" : flat;
+  const shown = flat.length > PLACEHOLDER_MAX_CHARS ? flat.slice(0, PLACEHOLDER_MAX_CHARS) + "…" : flat;
+  queryInput.placeholder = flat ? SUGGESTION_HINT + shown : DEFAULT_PLACEHOLDER;
   queryInput.classList.toggle("suggest", flat !== "");
 }
 
@@ -282,12 +285,15 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)。入力欄が空で本文を選択中なら、Tab で選択範囲を挿入する
+// VSTO 版と同じく Enter で検索 (Shift+Enter で改行)。
+// Tab は入力欄の中では、フォーカスを動かさない。入力欄が空で本文を選択中なら、選択範囲を挿入する (それ以外は何もしない)
 queryInput.addEventListener("keydown", (e) => {
-  if (e.key === "Tab" && !e.shiftKey && !e.isComposing && suggestion && queryInput.value === "") {
+  if (e.key === "Tab" && !e.isComposing) {
     e.preventDefault();
-    queryInput.value = suggestion.slice(0, queryInput.maxLength);
-    queryInput.setSelectionRange(queryInput.value.length, queryInput.value.length);
+    if (!e.shiftKey && suggestion && queryInput.value === "") {
+      queryInput.value = suggestion.slice(0, queryInput.maxLength);
+      queryInput.setSelectionRange(queryInput.value.length, queryInput.value.length);
+    }
     return;
   }
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
