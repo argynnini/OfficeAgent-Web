@@ -12,6 +12,10 @@ export class AcsPlayer {
   private timer: number | undefined;
   /** 再生要求ごとに増やし、古い再生ループを無効化する */
   private token = 0;
+  /** release() が呼ばれた: 分岐で繰り返さず、終了分岐をたどって終わらせる */
+  private releasing = false;
+  /** 現在の play() 全体 (戻りアニメ含む) の完了 Promise */
+  private running: Promise<void> | undefined;
 
   constructor(
     private readonly character: AcsCharacter,
@@ -30,26 +34,43 @@ export class AcsPlayer {
     this.timer = undefined;
   }
 
-  /** アニメーションを 1 回再生する。終了 (戻りアニメ含む) で resolve */
-  async play(name: string): Promise<void> {
+  /** アニメーションを再生する。終了 (戻りアニメ含む) か、別の再生・stop() で resolve */
+  play(name: string): Promise<void> {
     this.stop();
+    this.releasing = false;
     const token = this.token;
-    let current: Animation | undefined = this.character.animations.get(name);
-    // 戻りアニメの連鎖は念のため上限を設ける
-    for (let depth = 0; current && depth < 4; depth++) {
-      await this.playFrames(current, token);
-      if (token !== this.token) return;
-      if (current.transitionType !== 0 || !current.returnAnimation) break;
-      current = this.character.animations.get(current.returnAnimation);
-    }
+    const run = async () => {
+      let current: Animation | undefined = this.character.animations.get(name);
+      // 戻りアニメの連鎖は念のため上限を設ける
+      for (let depth = 0; current && depth < 4; depth++) {
+        await this.playFrames(current, token);
+        if (token !== this.token) return;
+        if (current.transitionType !== 0 || !current.returnAnimation) break;
+        current = this.character.animations.get(current.returnAnimation);
+      }
+    };
+    return (this.running = run());
+  }
+
+  /**
+   * 再生中のアニメーションを自然に終わらせる。分岐による繰り返しをやめ、
+   * 各フレームの終了分岐 (exit) をたどって「やめる動き」を最後まで再生する。
+   * 再生中でなければすぐ resolve。stop() のように途中で切らない。
+   */
+  release(): Promise<void> {
+    this.releasing = true;
+    return this.running ?? Promise.resolve();
   }
 
   private playFrames(anim: Animation, token: number): Promise<void> {
     return new Promise<void>((resolve) => {
+      let releasedSteps = 0;
       const step = (index: number) => {
         if (token !== this.token) return resolve();
         const frame = anim.frames[index];
         if (!frame) return resolve();
+        // 終了分岐が循環しても終わるように上限を設ける
+        if (this.releasing && ++releasedSteps > anim.frames.length * 3) return resolve();
         this.draw(frame);
         if (frame.soundIndex >= 0) void this.playSound(frame.soundIndex);
         const next = this.nextIndex(frame, index);
@@ -59,8 +80,9 @@ export class AcsPlayer {
     });
   }
 
-  /** 分岐 (確率は % 相当) があれば抽選し、なければ次のフレーム */
+  /** 分岐 (確率は % 相当) があれば抽選し、なければ次のフレーム。release 後は終了分岐を優先 */
   private nextIndex(frame: Frame, index: number): number {
+    if (this.releasing) return frame.exitFrame >= 0 ? frame.exitFrame : index + 1;
     let roll = Math.random() * 100;
     for (const b of frame.branches) {
       if (roll < b.probability) return b.frameIndex;

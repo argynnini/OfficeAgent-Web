@@ -99,7 +99,7 @@ function drawRest() {
 
 const firstAnimation = (...names: string[]) => names.find((n) => character?.animations.has(n));
 
-// --- 検索ボックスにフォーカス中は Writing を繰り返し、外れたら止めて待機ポーズに戻す ---
+// --- 検索ボックスにフォーカス中は Writing を続け、外れたらやめる動きを再生して待機ポーズに戻す ---
 let focused = false;
 /** 検索実行の Thinking 再生中は Writing を止めておく */
 let thinking = false;
@@ -116,8 +116,10 @@ queryInput.addEventListener("focus", () => {
 });
 queryInput.addEventListener("blur", () => {
   focused = false;
-  player?.stop();
-  drawRest();
+  // 途中で切らず、Writing の終了分岐 (書くのをやめる動き) を最後まで再生してから待機ポーズへ
+  void player?.release().then(() => {
+    if (!focused && !thinking) drawRest();
+  });
 });
 
 /** 検索実行時は Thinking を 1 回再生し、終わったらフォーカス中なら Writing に戻る */
