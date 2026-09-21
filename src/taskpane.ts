@@ -98,7 +98,33 @@ function playSearching() {
   if (name) void player?.play(name);
 }
 
+// --- 入力中は Searching を再生し、入力が止まったら待機ポーズに戻す ---
+const TYPING_IDLE_MS = 1500;
+let typingPlaying = false;
+let typingTimer: number | undefined;
+
+function drawRest() {
+  const rest = character?.animations.get("RestPose")?.frames[0];
+  if (rest) player?.draw(rest);
+}
+
+queryInput.addEventListener("input", () => {
+  window.clearTimeout(typingTimer);
+  if (!typingPlaying) {
+    typingPlaying = true;
+    const name = ["Searching", "Thinking", "Processing"].find((n) => character?.animations.has(n));
+    if (name && player) void player.play(name).finally(() => (typingPlaying = false));
+    else typingPlaying = false;
+  }
+  typingTimer = window.setTimeout(() => {
+    player?.stop();
+    typingPlaying = false;
+    drawRest();
+  }, TYPING_IDLE_MS);
+});
+
 function runSearch() {
+  window.clearTimeout(typingTimer);
   const text = queryInput.value.trim();
   const engine = SEARCH_ENGINES[Number(engineSelect.value)];
   if (!text || !engine) return;
