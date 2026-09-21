@@ -15,6 +15,7 @@ export class AcsPlayer {
   /** release() が呼ばれた: 分岐で繰り返さず、終了分岐をたどって終わらせる */
   private releasing = false;
   private active = false;
+  private current: string | undefined;
   /** 再生中かどうかが変わったときに呼ばれる (UI のアイコン切り替え用) */
   onPlayingChange: ((playing: boolean) => void) | undefined;
   /** 現在の play() 全体 (戻りアニメ含む) の完了 Promise */
@@ -31,6 +32,11 @@ export class AcsPlayer {
     this.ctx = ctx;
   }
 
+  /** 再生中のアニメーション名 (再生中でなければ undefined) */
+  get currentAnimation(): string | undefined {
+    return this.current;
+  }
+
   /** アニメーション再生中か (stop() や再生完了で false) */
   get isPlaying(): boolean {
     return this.active;
@@ -43,6 +49,7 @@ export class AcsPlayer {
   }
 
   stop() {
+    this.current = undefined;
     this.setActive(false);
     this.token++;
     if (this.timer !== undefined) window.clearTimeout(this.timer);
@@ -53,6 +60,7 @@ export class AcsPlayer {
   play(name: string): Promise<void> {
     this.stop();
     this.releasing = false;
+    this.current = name;
     this.setActive(true);
     const token = this.token;
     const run = async () => {
@@ -64,7 +72,10 @@ export class AcsPlayer {
         if (current.transitionType !== 0 || !current.returnAnimation) break;
         current = this.character.animations.get(current.returnAnimation);
       }
-      if (token === this.token) this.setActive(false);
+      if (token === this.token) {
+        this.current = undefined;
+        this.setActive(false);
+      }
     };
     return (this.running = run());
   }

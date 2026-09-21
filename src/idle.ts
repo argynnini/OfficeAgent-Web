@@ -14,6 +14,8 @@ const MAX_SHALLOW_IDLE_MS = 25_000;
 /** ユーザー操作で待機動作を止めるとき、終了分岐を待つ上限 */
 const INTERRUPT_WAIT_MS = 1_500;
 
+export const isIdleName = (name: string | undefined): boolean => name !== undefined && IDLE_NAME.test(name);
+
 /** 待機動作の「深さ」。Idle1_x < Idle2_x < Idle3_x、居眠りや DeepIdle は最深 */
 export function idleLevel(name: string): number {
   const m = /^Idle(\d)_/i.exec(name);

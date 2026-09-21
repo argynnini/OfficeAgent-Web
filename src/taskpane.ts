@@ -1,6 +1,6 @@
 import { AcsPlayer } from "./acs/player";
 import { AcsCharacter } from "./acs/reader";
-import { IdleController } from "./idle";
+import { IdleController, isIdleName } from "./idle";
 import { buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
 
@@ -38,8 +38,12 @@ const SKIP = /^(Idle|RestPose|Show|Hide|GoodBye|Greet)/i;
 
 let lastAnimation: string | undefined;
 
-/** 再生中は ■ (クリックで停止)、待機中は ▶ */
+/** 自分で再生したアニメーションの再生中か (放置中に勝手に始まる待機動作は含めない) */
+const userAnimationPlaying = () => !!player?.isPlaying && !isIdleName(player.currentAnimation);
+
+/** 再生中は ■ (クリックで停止)、待機中は ▶。待機動作 (Idle) の再生中は ▶ のまま */
 function renderPlayButton(playing: boolean) {
+  playing = playing && userAnimationPlaying();
   playButton.dataset.playing = String(playing);
   playButton.title = playing
     ? "停止\nクリックでアニメーションを止めて待機ポーズに戻します。"
@@ -219,9 +223,9 @@ queryInput.addEventListener("keydown", (e) => {
 
 // カイル君をクリックするとランダムにアニメーション
 canvas.addEventListener("click", playRandom);
-// 再生ボタン: 再生中はクリックで停止して待機ポーズへ。待機中は直前のアニメーションをもう一度 (未選択ならランダム)
+// 再生ボタン: 再生中はクリックで停止して待機ポーズへ。待機中 (待機動作の再生中を含む) は直前のアニメーションをもう一度 (未選択ならランダム)
 playButton.addEventListener("click", () => {
-  if (player?.isPlaying) {
+  if (player && userAnimationPlaying()) {
     player.stop();
     drawRest();
   } else if (lastAnimation) {
