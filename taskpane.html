@@ -55,7 +55,6 @@
       /* キャラクター未選択・エラーなどのメッセージ用 (空のときは場所を取らない) */
       .status { text-align: center; margin-top: 6px; font-size: 12px; color: #888; }
       .status:empty { display: none; }
-      #host { text-align: center; margin-top: 8px; font-size: 11px; }
 
       /*
        * 検索吹き出し。VSTO 版 SearchBalloonForm と同じ配色・寸法:
@@ -183,9 +182,8 @@
         </div>
       </div>
 
-      <!-- カイル君の下: 状態メッセージ、ホスト情報 -->
+      <!-- カイル君の下: 状態メッセージ (未選択の案内・エラー) -->
       <div id="status" class="status"></div>
-      <div id="host" class="muted"></div>
     </div>
     <script type="module" src="/src/taskpane.ts"></script>
   </body>

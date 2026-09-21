@@ -7,7 +7,6 @@ import { loadCharacter, saveCharacter } from "./store";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>("stage");
 const status = $("status");
-const hostLabel = $("host");
 const flyout = $("flyout");
 const playButton = $<HTMLButtonElement>("play");
 const queryInput = $<HTMLTextAreaElement>("query");
@@ -355,8 +354,6 @@ soundButton.addEventListener("click", () => {
 });
 
 void Office.onReady(async (info) => {
-  hostLabel.textContent = info.host ? `Office: ${info.host} / ${info.platform}` : "ブラウザ単体で実行中 (Office 外)";
-
   if (info.host) {
     Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged, (r) => {
       if (r.status !== Office.AsyncResultStatus.Succeeded) {
