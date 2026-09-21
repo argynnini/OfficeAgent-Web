@@ -72,6 +72,8 @@ function useCharacter(data: ArrayBuffer, name: string) {
     if (!playing) idle.animationEnded();
   };
   renderPlayButton(false);
+  // 読み込んだ時点から放置時間を数え直す (直後から深い待機動作が出ないように)
+  idle.userActivity();
   const rest = character.animations.get("RestPose") ?? character.animations.values().next().value;
   if (rest?.frames[0]) player.draw(rest.frames[0]);
   status.textContent = name;
