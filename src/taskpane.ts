@@ -1,6 +1,6 @@
 import { AcsPlayer } from "./acs/player";
 import { AcsCharacter } from "./acs/reader";
-import { watchWorksheetEvents } from "./excel";
+import { watchWorksheetActivated } from "./excel";
 import { IdleController, isIdleName } from "./idle";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
@@ -220,7 +220,7 @@ const idle = new IdleController({
 idle.start();
 for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => idle.userActivity());
 
-// --- ドキュメント側のイベントへの反応 (Excel のシート操作など) ---
+// --- ドキュメント側のイベントへの反応 (Excel のシート切り替えなど) ---
 /** 待機動作を自然に終わらせてから、候補の先頭に見つかったアニメーションを 1 つ再生する (入力中・検索中・他の再生中は何もしない) */
 function reactTo(...candidates: string[]) {
   if (!player || !character || focused || thinking || userAnimationPlaying()) return;
@@ -429,12 +429,8 @@ void Office.onReady(async (info) => {
     showSelection();
   }
   if (info.host === Office.HostType.Excel) {
-    watchWorksheetEvents({
-      onAdded: () => reactTo("Congratulate", "Pleased", "Announce", "GetAttention"),
-      onDeleted: () => reactTo("Confused", "Decline", "Sad"),
-      onActivated: onSheetActivated,
-    }).catch((e: unknown) => {
-      setStatus(`シート操作イベントを登録できません: ${(e as Error).message}`);
+    watchWorksheetActivated(onSheetActivated).catch((e: unknown) => {
+      setStatus(`シート切り替えイベントを登録できません: ${(e as Error).message}`);
     });
   }
 
