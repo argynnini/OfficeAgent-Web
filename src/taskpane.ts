@@ -8,8 +8,18 @@ import { loadCharacter, saveCharacter } from "./store";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>("stage");
 const status = $("status");
+const statusTitle = $("status-title");
+const statusDesc = $("status-desc");
 const flyout = $("flyout");
+
+/** 検索吹き出しの代わりに出す見出し + 補足。title が空なら隠す (title だけの1行でもよい) */
+function setStatus(title: string, desc = "") {
+  statusTitle.textContent = title;
+  statusDesc.textContent = desc;
+  status.hidden = !title;
+}
 const playButton = $<HTMLButtonElement>("play");
+const pickButton = $<HTMLButtonElement>("pick");
 const queryInput = $<HTMLTextAreaElement>("query");
 const engineSelect = $<HTMLSelectElement>("engine");
 const fileInput = $<HTMLInputElement>("file");
@@ -28,6 +38,16 @@ renderSoundButton();
 
 let player: AcsPlayer | undefined;
 let character: AcsCharacter | undefined;
+
+/** キャラクター未選択の間は、選ぶボタンを点滅させて誘導し、キャラクターが要る音声・再生ボタンは無効にする */
+function updateCharacterRequiredUi() {
+  const loaded = !!character;
+  pickButton.classList.toggle("attract", !loaded);
+  soundButton.disabled = !loaded;
+  playButton.disabled = !loaded;
+}
+updateCharacterRequiredUi();
+
 /** 自動再生に向かない (待機・登場・退場) アニメーションを除く */
 const SKIP = /^(Idle|RestPose|Show|Hide|GoodBye|Greet)/i;
 
@@ -81,7 +101,8 @@ function useCharacter(data: ArrayBuffer, name: string) {
   // キャラクター名 (ACS に埋め込まれた名前。読めなければファイル名から拡張子を除いたもの) はツールチップに出す
   const displayName = character.name || name.replace(/\.[^.]+$/, "");
   canvas.title = `${displayName}\nクリックでアニメーション`;
-  status.textContent = "";
+  setStatus("");
+  updateCharacterRequiredUi();
 
   const names = [...character.animations.keys()].sort();
   flyout.replaceChildren(
@@ -106,7 +127,8 @@ async function pickFile(file: File) {
     useCharacter(data, file.name);
     await saveCharacter(file.name, data).catch(() => undefined);
   } catch (e) {
-    status.textContent = `読み込みに失敗しました: ${(e as Error).message}`;
+    setStatus(`読み込みに失敗しました: ${(e as Error).message}`);
+    updateCharacterRequiredUi();
   }
 }
 
@@ -308,7 +330,7 @@ function openExternal(url: string) {
   // ユーザー操作の直後に開く (ポップアップブロック回避)
   const win = window.open(url, "_blank");
   if (win) win.opener = null;
-  else status.textContent = "ブラウザに検索ページを開くのをブロックされました。許可してください。";
+  else setStatus("ブラウザに検索ページを開くのをブロックされました。許可してください。");
 }
 
 // 検索結果の読み込みが終わったら Thinking を終え、GetWizardy があれば再生する (検索中でなければ何もしない)
@@ -369,7 +391,7 @@ playButton.addEventListener("click", () => {
     playRandom();
   }
 });
-$("pick").addEventListener("click", () => fileInput.click());
+pickButton.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => {
   const f = fileInput.files?.[0];
   if (f) void pickFile(f);
@@ -401,7 +423,7 @@ void Office.onReady(async (info) => {
   if (info.host) {
     Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged, (r) => {
       if (r.status !== Office.AsyncResultStatus.Succeeded) {
-        status.textContent = `選択変更イベントを登録できません: ${r.error.message}`;
+        setStatus(`選択変更イベントを登録できません: ${r.error.message}`);
       }
     });
     showSelection();
@@ -421,9 +443,9 @@ void Office.onReady(async (info) => {
     try {
       useCharacter(saved.data, saved.name);
     } catch {
-      status.textContent = "保存済みキャラクターを読み込めませんでした。もう一度選んでください。";
+      setStatus("保存済みキャラクターを読み込めませんでした。もう一度選んでください。");
     }
   } else {
-    status.textContent = "「キャラクターを選ぶ」から .acs を選んでください（次回から自動で読み込みます）";
+    setStatus("キャラクターファイルを選択してください。", "🐬をクリックして、Microsoft Agent キャラクターファイル (.acs) を選択してください");
   }
 });
