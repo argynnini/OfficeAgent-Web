@@ -27,7 +27,12 @@
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <style>
       html { height: 100%; }
-      body { font-family: "Segoe UI", "Yu Gothic UI", sans-serif; margin: 0; padding: 12px; font-size: 13px; min-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; }
+      /*
+       * height を 100% で固定する (min-height だと、中身が伸びたぶんタスクペイン自体が伸びて、
+       * 二重スクロール (ペインの外側 + #chat-messages の内側) になってしまう)。
+       * overflow: hidden で、はみ出す分は #chat-messages など中の要素だけでスクロールさせる
+       */
+      body { font-family: "Segoe UI", "Yu Gothic UI", sans-serif; margin: 0; padding: 12px; font-size: 13px; height: 100%; overflow: hidden; box-sizing: border-box; display: flex; flex-direction: column; }
       /* 吹き出し + カイル君を作業ウィンドウの下端に寄せる */
       #dock { margin-top: auto; padding-top: 16px; }
       #stage { display: block; cursor: pointer; }
@@ -115,10 +120,12 @@
       .settings-panel[hidden] { display: none; }
       .settings-panel label { display: block; margin: 10px 0 4px; font-weight: 600; }
       .settings-panel label:first-child { margin-top: 0; }
-      /* 見出し行: ラベルの右側に、疎通確認の結果 (テキストのみ) を出す */
-      .settings-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 0; }
+      /* 見出し行: ラベルの右側に、疎通確認の結果やリセットボタンなどを出す */
+      .settings-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 10px; }
       .settings-label-row label { margin: 0; }
       .settings-label-row:first-child { margin-top: 0; }
+      .settings-reset { flex: none; padding: 0; border: 0; background: transparent; color: var(--btn-fg); font: inherit; font-size: 11px; text-decoration: underline; cursor: pointer; }
+      .settings-reset:hover { color: inherit; }
       .settings-panel input, .settings-panel select, .settings-panel textarea { width: 100%; box-sizing: border-box; padding: 5px 8px; margin-bottom: 6px; border: 1px solid var(--menu-border); border-radius: 6px; color: inherit; font: inherit; color-scheme: var(--menu-scheme); }
       .settings-panel input, .settings-panel textarea { background: transparent; }
       .settings-panel textarea { resize: vertical; }
@@ -252,16 +259,37 @@
 
       /* Groq (AI) とのチャット表示。検索結果と同じ枠を使い回し、iframe の代わりに吹き出しのやり取りを積む */
       .chat-messages[hidden] { display: none; }
-      /*
-       * min-height: 0 だけでは、body が min-height: 100% (高さ固定ではない) なせいで祖先の高さが
-       * そもそも制限されず、効かない。max-height を付けて、ここだけは確実にビューポート基準で頭打ちにする
-       */
-      .chat-messages { flex: 1 1 auto; min-height: 0; max-height: min(50vh, 420px); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-      .chat-msg { max-width: 85%; padding: 6px 10px; border-radius: 12px; line-height: 1.5; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+      /* min-height: 0 がないと、flex item は中身の高さぶん際限なく伸びて overflow-y が効かない (body が
+         height: 100% で固定されているので、これで #results の残り高さいっぱいに広がり、それ以上は内側でスクロールする) */
+      .chat-messages { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+      .chat-msg { max-width: 85%; padding: 6px 10px; border-radius: 12px; line-height: 1.5; font-size: 13px; word-break: break-word; }
+      /* assistant は Markdown を HTML として描画するので、素のテキストのときだけ改行を残す */
+      .chat-msg.user, .chat-msg.error, .chat-msg.pending { white-space: pre-wrap; }
       .chat-msg.user { align-self: flex-end; background: #e8f0fe; color: #14315c; border-bottom-right-radius: 2px; }
       .chat-msg.assistant { align-self: flex-start; background: #f1f1f0; color: #222; border-bottom-left-radius: 2px; }
       .chat-msg.error { align-self: flex-start; background: #fdecea; color: #7a2a20; border-bottom-left-radius: 2px; }
       .chat-msg.pending { color: #888; font-style: italic; }
+      /* assistant の Markdown 表示 */
+      .chat-msg.assistant > :first-child { margin-top: 0; }
+      .chat-msg.assistant > :last-child { margin-bottom: 0; }
+      .chat-msg.assistant p, .chat-msg.assistant ul, .chat-msg.assistant ol, .chat-msg.assistant pre, .chat-msg.assistant blockquote, .chat-msg.assistant table { margin: 0 0 8px; }
+      .chat-msg.assistant ul, .chat-msg.assistant ol { padding-left: 1.4em; }
+      .chat-msg.assistant li { margin: 2px 0; }
+      .chat-msg.assistant h1, .chat-msg.assistant h2, .chat-msg.assistant h3, .chat-msg.assistant h4 { font-size: 1.05em; margin: 8px 0 4px; }
+      .chat-msg.assistant code { background: rgba(0, 0, 0, 0.08); padding: 1px 4px; border-radius: 4px; font-size: 0.9em; }
+      .chat-msg.assistant pre { background: rgba(0, 0, 0, 0.08); padding: 8px; border-radius: 8px; overflow-x: auto; }
+      .chat-msg.assistant pre code { background: none; padding: 0; }
+      .chat-msg.assistant a { color: #1a56db; text-decoration: underline; }
+      .chat-msg.assistant blockquote { padding-left: 8px; border-left: 2px solid rgba(0, 0, 0, 0.2); color: #555; }
+      .chat-msg.assistant table { border-collapse: collapse; font-size: 0.95em; }
+      .chat-msg.assistant th, .chat-msg.assistant td { border: 1px solid rgba(0, 0, 0, 0.15); padding: 2px 6px; }
+      .chat-copy { display: inline-flex; align-items: center; justify-content: center; margin-top: 6px; padding: 3px; border: 0; border-radius: 4px; background: transparent; color: #888; cursor: pointer; transition: background-color 0.12s ease, color 0.12s ease; }
+      .chat-copy:hover { color: #222; background: rgba(0, 0, 0, 0.07); }
+      .chat-copy .icon-copied { display: none; }
+      .chat-copy[data-copied="true"] { color: #2a7a3b; }
+      .chat-copy[data-copied="true"] .icon-copy { display: none; }
+      .chat-copy[data-copied="true"] .icon-copied { display: inline; }
+      .chat-copy[data-copied="false"] { color: #b5342a; }
     </style>
   </head>
   <body>
@@ -323,7 +351,10 @@
               <select id="groq-model" disabled title="質問に使うモデルを選びます。&#10;APIキーを登録すると一覧を取得します。">
                 <option value="">APIキーを登録するとモデル一覧を取得</option>
               </select>
-              <label for="groq-persona">性格 (システムプロンプト)</label>
+              <div class="settings-label-row">
+                <label for="groq-persona">性格 (システムプロンプト)</label>
+                <button id="groq-persona-reset" type="button" class="settings-reset" title="キャラクターの名前・紹介文 (あれば) から作り直します。">リセット</button>
+              </div>
               <textarea id="groq-persona" rows="3" spellcheck="false" title="AI の話し方・回答のルールを指定します。&#10;質問のたびに、これを先頭に付けて送ります。"></textarea>
             </div>
           </div>

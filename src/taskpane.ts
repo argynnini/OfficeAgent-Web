@@ -1,9 +1,20 @@
 import { AcsPlayer } from "./acs/player";
 import { AcsCharacter } from "./acs/reader";
+import DOMPurify from "dompurify";
 import { askGroq, GroqChatMessage, testGroqKey } from "./groq";
 import { IdleController, isIdleName } from "./idle";
+import { marked } from "marked";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
+
+marked.setOptions({ breaks: true, gfm: true });
+// リンクは、他のタブで安全に開く (target/rel はサニタイズ後に付け直さないと DOMPurify に消される)
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  if (node.tagName === "A") {
+    node.setAttribute("target", "_blank");
+    node.setAttribute("rel", "noopener noreferrer");
+  }
+});
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>("stage");
@@ -38,6 +49,8 @@ renderSoundButton();
 
 let player: AcsPlayer | undefined;
 let character: AcsCharacter | undefined;
+/** 性格リセット用に覚えておく、現在のキャラクターの表示名 */
+let currentCharacterDisplayName: string | undefined;
 
 /** キャラクター未選択の間は、選ぶボタンを点滅させて誘導し、キャラクターが要る音声・再生ボタンは無効にする */
 function updateCharacterRequiredUi() {
@@ -101,6 +114,8 @@ function useCharacter(data: ArrayBuffer, name: string) {
   // キャラクター名 (ACS に埋め込まれた名前。読めなければファイル名から拡張子を除いたもの) はツールチップに出す
   const displayName = character.name || name.replace(/\.[^.]+$/, "");
   canvas.title = `${displayName}\nクリックでアニメーション`;
+  currentCharacterDisplayName = displayName;
+  applyCharacterPersonaIfUnset(displayName, character.description);
   setStatus("");
   updateCharacterRequiredUi();
 
@@ -175,7 +190,9 @@ function onSelectionChanged() {
 const ENGINE_KEY = "officeagent.engine";
 /** 検索エンジンではなく Groq (AI) を選んでいるときの、engineSelect の値 */
 const GROQ_ENGINE_NAME = "Groq";
-engineSelect.replaceChildren(...SEARCH_ENGINES.map((e) => new Option(e.name, e.name)), new Option(GROQ_ENGINE_NAME, GROQ_ENGINE_NAME));
+/** 選んでいるモデル名を、表示だけ「Groq (モデル名)」のように付け足す (value は GROQ_ENGINE_NAME のまま) */
+const groqEngineOption = new Option(GROQ_ENGINE_NAME, GROQ_ENGINE_NAME);
+engineSelect.replaceChildren(...SEARCH_ENGINES.map((e) => new Option(e.name, e.name)), groqEngineOption);
 try {
   // 保存しているのは検索エンジン名。以前の版の番号や、いまは無いエンジン名なら、先頭を選ぶ
   engineSelect.value = localStorage.getItem(ENGINE_KEY) ?? "";
@@ -325,6 +342,9 @@ function closeResults() {
   results.hidden = true;
   resultsFrame.src = "about:blank";
   resultsExternalUrl = undefined;
+  // Groq とのチャットは、閉じたら次回は新しい会話として始める
+  chatMessages.replaceChildren();
+  chatHistory = [];
 }
 
 function openExternal(url: string) {
@@ -341,9 +361,24 @@ resultsOpenButton.addEventListener("click", () => resultsExternalUrl && openExte
 
 // --- Groq (AI) とのチャット。同じ結果パネルを使い回し、iframe の代わりにやり取りを積む ---
 const chatMessages = $("chat-messages");
-/** 既定では日本語で答えさせる (指定しないと、モデルによって英語やアラビア語など別の言語で返ってくることがある) */
+/** 実行中の Office ホスト (Word/Excel/PowerPoint)。Office.onReady で判明するまでは undefined */
+let officeHostName: string | undefined;
+
+function hostDisplayName(host: Office.HostType): string | undefined {
+  switch (host) {
+    case Office.HostType.Word: return "Word";
+    case Office.HostType.Excel: return "Excel";
+    case Office.HostType.PowerPoint: return "PowerPoint";
+    default: return undefined;
+  }
+}
+
+/** 既定では日本語で答えさせる (指定しないと、モデルによって英語やアラビア語など別の言語で返ってくることがある)。
+ *  実行中のホスト名は、性格 (編集・保存される文面) とは別に、送信のたびに現在の値を付け足す */
 function groqSystemPrompt(): GroqChatMessage {
-  return { role: "system", content: groqPersonaInput.value.trim() || DEFAULT_GROQ_PERSONA };
+  const persona = groqPersonaInput.value.trim() || DEFAULT_GROQ_PERSONA;
+  const content = officeHostName ? `${persona} 現在は Microsoft ${officeHostName} 上で動いています。` : persona;
+  return { role: "system", content };
 }
 /** 今回のパネルを開いてからのやり取り (システムプロンプトは含めない。Groq へ送るときに毎回付ける) */
 let chatHistory: GroqChatMessage[] = [];
@@ -351,10 +386,115 @@ let chatHistory: GroqChatMessage[] = [];
 function addChatMessage(className: string, text: string): HTMLDivElement {
   const el = document.createElement("div");
   el.className = `chat-msg ${className}`;
-  el.textContent = text;
+  // AI の返答 (確定したものだけ) は Markdown として描画する。それ以外 (自分の発言・待機中・エラー) は素のテキスト
+  if (className === "assistant") {
+    const html = DOMPurify.sanitize(marked.parse(text, { async: false }));
+    el.innerHTML = html;
+    el.appendChild(buildCopyButton(text, html));
+  } else {
+    el.textContent = text;
+  }
   chatMessages.appendChild(el);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return el;
+}
+
+/** Word などにそのまま貼れるよう、書式付き (HTML) とプレーンテキストの両方をクリップボードに入れる */
+async function copyRichText(plainText: string, html: string): Promise<boolean> {
+  // 書式付き (HTML) を試し、環境の制限などで失敗したら、素のテキストだけでも貼れるようにする
+  if (typeof ClipboardItem !== "undefined") {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/plain": new Blob([plainText], { type: "text/plain" }),
+          "text/html": new Blob([html], { type: "text/html" }),
+        }),
+      ]);
+      return true;
+    } catch (e) {
+      console.warn("書式付きコピーに失敗したため、プレーンテキストで再試行します", e);
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(plainText);
+    return true;
+  } catch (e) {
+    console.warn("navigator.clipboard に失敗したため、execCommand で再試行します", e);
+  }
+  // タスクペインは Office 側の iframe に埋め込まれるため、Permissions-Policy で
+  // navigator.clipboard 自体が使えないことがある。その場合の最後の手段
+  return legacyCopyText(plainText);
+}
+
+function legacyCopyText(text: string): boolean {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch (e) {
+    console.error("クリップボードへのコピーに失敗しました", e);
+  }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+const COPY_TITLE = "この返答をコピー (書式付きで貼り付けできます)";
+
+function buildCopyButton(plainText: string, html: string): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "chat-copy";
+  btn.title = COPY_TITLE;
+  btn.innerHTML = `
+    <svg class="icon-copy" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <path d="M3.5 10.5v-6a1 1 0 0 1 1-1h6" fill="none" stroke="currentColor" stroke-width="1.3"/>
+    </svg>
+    <svg class="icon-copied" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `;
+  btn.addEventListener("click", () => {
+    void copyRichText(plainText, html).then(async (ok) => {
+      btn.dataset.copied = String(ok);
+      if (ok) {
+        btn.title = "コピーしました";
+        window.setTimeout(() => {
+          delete btn.dataset.copied;
+          btn.title = COPY_TITLE;
+        }, 1500);
+        return;
+      }
+      // 失敗時は、権限が拒否されているのかを調べて、直し方が分かるように案内する
+      const guidance = (await clipboardPermissionState()) === "denied"
+        ? "クリップボードへのアクセスが拒否されています。ブラウザのアドレスバー付近のアイコン（鍵マークなど）から、このサイトのクリップボードへのアクセスを許可してください。"
+        : "コピーできませんでした。ブラウザや Office 側の制限で、クリップボードにアクセスできない可能性があります。";
+      btn.title = guidance;
+      setStatus(guidance);
+      window.setTimeout(() => {
+        delete btn.dataset.copied;
+        btn.title = COPY_TITLE;
+        setStatus("");
+      }, 6000);
+    });
+  });
+  return btn;
+}
+
+/** クリップボードへの書き込み権限の状態。対応していないブラウザでは undefined */
+async function clipboardPermissionState(): Promise<PermissionState | undefined> {
+  try {
+    const status = await navigator.permissions.query({ name: "clipboard-write" as PermissionName });
+    return status.state;
+  } catch {
+    return undefined;
+  }
 }
 
 function showChat() {
@@ -470,6 +610,39 @@ try {
 }
 // 前回選んだモデルがあれば、再取得するまでの間そのまま見えるようにしておく (選べはしない)
 if (savedGroqModel) groqModelSelect.replaceChildren(new Option(savedGroqModel, savedGroqModel));
+
+/** 検索エンジンの選択肢の「Groq」表示に、選んでいるモデル名を付け足す */
+function updateGroqEngineOptionLabel() {
+  groqEngineOption.text = groqModelSelect.value ? `${GROQ_ENGINE_NAME} (${groqModelSelect.value})` : GROQ_ENGINE_NAME;
+}
+updateGroqEngineOptionLabel();
+
+/** キャラクターの名前・紹介文 (ACS にあれば) をもとに性格 (システムプロンプト) の文面を作る */
+function buildGroqPersonaFromCharacter(displayName: string, description: string | undefined): string {
+  const intro = description
+    ? `あなたは Microsoft Office アシスタントの「${displayName}」です。${description}`
+    : `あなたは Microsoft Office アシスタントの「${displayName}」です。`;
+  return `${intro} 特に指定がない限り、日本語で簡潔に答えてください。`;
+}
+
+/** ユーザーが性格を自分で編集・保存したことがなければ、読み込んだキャラクターの内容で更新する (編集済みなら上書きしない) */
+function applyCharacterPersonaIfUnset(displayName: string, description: string | undefined) {
+  let customized = false;
+  try {
+    customized = localStorage.getItem(GROQ_PERSONA_STORAGE) !== null;
+  } catch { /* 保存できない環境では、毎回キャラクターの内容で表示する */ }
+  if (!customized) groqPersonaInput.value = buildGroqPersonaFromCharacter(displayName, description);
+}
+
+$<HTMLButtonElement>("groq-persona-reset").addEventListener("click", () => {
+  try {
+    localStorage.removeItem(GROQ_PERSONA_STORAGE);
+  } catch { /* ignore */ }
+  groqPersonaInput.value = currentCharacterDisplayName
+    ? buildGroqPersonaFromCharacter(currentCharacterDisplayName, character?.description)
+    : DEFAULT_GROQ_PERSONA;
+});
+
 /** このセッション中に一度でも疎通確認したか (自動実行を、設定パネルを開くたびに繰り返さないため) */
 let groqTestedThisSession = false;
 
@@ -487,11 +660,13 @@ function runGroqTest() {
       // 前回選んでいたモデルが一覧にあれば選び直し、無ければ (モデルの廃止など) 先頭のまま
       if (result.models.includes(savedGroqModel)) groqModelSelect.value = savedGroqModel;
       else groqModelSelect.dispatchEvent(new Event("change"));
+      updateGroqEngineOptionLabel();
     }
   });
 }
 
 groqModelSelect.addEventListener("change", () => {
+  updateGroqEngineOptionLabel();
   try {
     localStorage.setItem(GROQ_MODEL_STORAGE, groqModelSelect.value);
   } catch { /* ignore */ }
@@ -560,8 +735,11 @@ function applyOfficeTheme() {
 }
 
 void Office.onReady(async (info) => {
-  if (info.host) applyOfficeTheme();
-  if (info.host) {
+  // Office.HostType.Word は 0 なので、if (info.host) だと Word のときだけ偽になってしまう。undefined と比べる
+  const inOffice = info.host !== undefined;
+  if (inOffice) applyOfficeTheme();
+  officeHostName = inOffice ? hostDisplayName(info.host) : undefined;
+  if (inOffice) {
     Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged, (r) => {
       if (r.status !== Office.AsyncResultStatus.Succeeded) {
         setStatus(`選択変更イベントを登録できません: ${r.error.message}`);
