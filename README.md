@@ -1,7 +1,10 @@
 # OfficeAgent-Web
 
 [OfficeAgent](https://github.com/argynnini/OfficeAgent)（VSTO 版カイル君）の Office.js アドイン版。
-Word / Excel / PowerPoint / Outlook の Web 版・Mac・モバイルにカイル君を登場させることを目指す実験的プロジェクト。
+Word / Excel / PowerPoint / Outlook の Web 版・Mac・モバイルにカイル君を登場させることを目指す実験的プロジェクト。  
+|デスクトップ(Windows)|Web|
+|:--:|:--:|
+|<img src="https://github.com/user-attachments/assets/5d0e85da-bb70-4c81-9a15-0b07e76b571c" />|<img src="https://github.com/user-attachments/assets/88a8143b-42b2-4d6d-8f0e-c2c27083a0e5" />|
 
 ## キャラクターファイル (.acs) の入手
 
@@ -74,7 +77,3 @@ master に push すると、GitHub Actions（`.github/workflows/deploy.yml`）�
 3. 選択範囲の要約・翻訳・解説・誤字脱字チェック
 4. Excel シート追加や選択変更などのイベント連動アニメ
 5. Web Speech API によるノート読み上げ
-
-## 注意
-
-`.acs`（Microsoft Agent キャラクター）は再配布可否を確認するまでリポジトリに含めない。
