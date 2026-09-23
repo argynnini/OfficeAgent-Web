@@ -95,6 +95,8 @@ function useCharacter(data: ArrayBuffer, name: string) {
   character = new AcsCharacter(data);
   player = new AcsPlayer(character, canvas);
   player.soundEnabled = soundOn;
+  // 既にクリックなどの操作が済んでいれば (例: キャラを選ぶ前に何か触っていた場合)、ここで先に再開しておく
+  player.unlockAudio();
   player.onPlayingChange = (playing) => {
     renderPlayButton(playing);
     if (!playing) idle.animationEnded();
@@ -254,7 +256,12 @@ const idle = new IdleController({
   busy: () => focused || thinking,
 });
 idle.start();
-for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => idle.userActivity());
+for (const type of ["pointerdown", "keydown"]) {
+  document.addEventListener(type, () => {
+    idle.userActivity();
+    player?.unlockAudio();
+  });
+}
 
 /** 読み込みが終わらないまま Thinking が続き続けないようにする上限 */
 const THINKING_MAX_MS = 20_000;

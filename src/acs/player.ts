@@ -134,6 +134,16 @@ export class AcsPlayer {
     return index + 1;
   }
 
+  /**
+   * ブラウザの自動再生制限で、ユーザー操作 (クリック・キー入力) より前は音を鳴らせない。
+   * 効果音が鳴るタイミングまで AudioContext の再開を待つと、その分だけ後の操作でも
+   * 反映が遅れることがあるので、何か操作があった時点で先に再開しておく (無害な空振りも許容)
+   */
+  unlockAudio() {
+    this.audioCtx ??= new AudioContext();
+    if (this.audioCtx.state === "suspended") void this.audioCtx.resume().catch(() => undefined);
+  }
+
   private async playSound(index: number) {
     if (!this.soundEnabled) return;
     this.audioCtx ??= new AudioContext();
