@@ -434,7 +434,7 @@ void Office.onReady(async (info) => {
       onDeleted: () => reactTo("Confused", "Decline", "Sad"),
       onActivated: onSheetActivated,
     }).catch((e: unknown) => {
-      status.textContent = `シート操作イベントを登録できません: ${(e as Error).message}`;
+      setStatus(`シート操作イベントを登録できません: ${(e as Error).message}`);
     });
   }
 
