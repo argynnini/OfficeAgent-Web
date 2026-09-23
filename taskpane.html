@@ -73,6 +73,18 @@
       /* オフ: さらに薄くなる */
       .icon-btn[aria-pressed="false"] { opacity: 0.55; }
       .icon-btn[aria-pressed="false"]:hover { transform: none; }
+      /* キャラクター未選択の間、音声・再生ボタンは無効にする */
+      .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+      .icon-btn:disabled:hover { background: transparent; border-color: var(--btn-border); transform: none; }
+      /* キャラクターを選ぶボタン: 未選択の間は点滅させて目立たせる */
+      @keyframes pick-attract {
+        0%, 100% { opacity: 1; transform: none; }
+        50% { opacity: 0.4; transform: scale(1.1); }
+      }
+      #pick.attract { animation: pick-attract 1.4s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) { #pick.attract { animation: none; } }
+      /* 未選択の間は、絵文字の彩度を落とさず (ホバーしていなくても) 色を目立たせる */
+      #pick.attract .emoji { filter: saturate(1.6) brightness(1.05); opacity: 1; }
       /* 再生ボタンのサブメニュー: ホバー/フォーカスで上に開く。キャラ未選択(空)のときは出さない */
       .menu-wrap { position: relative; }
       /* ボタンのすぐ上に隙間なく開く (右端をボタンに揃える。隙間があると、ボタンからメニューへ移る途中でホバーが切れる) */
@@ -93,9 +105,41 @@
       .side-row { display: flex; gap: 6px; }
       .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
       .muted { color: #888; }
-      /* キャラクター未選択・エラーなどのメッセージ用 (空のときは場所を取らない) */
-      .status { text-align: center; margin-top: 6px; font-size: 12px; color: #888; }
-      .status:empty { display: none; }
+      /*
+       * #status と #balloon (検索吹き出し) を同じマス目に重ねて置き、高さを揃える。
+       * #balloon は非表示でも visibility (display ではなく) で隠すので、マス目の高さは常に #balloon の高さのまま。
+       * #status は既定で高さいっぱいに伸びる (grid の align-items: stretch)。
+       * 幅の上限・中央寄せもこのマス目自体に持たせる。#status / #balloon 側に margin: auto を置くと、
+       * grid item の既定の stretch が打ち消されて中身の幅 (textarea の既定幅など) に縮んでしまうため
+       */
+      .balloon-slot { display: grid; max-width: 390px; margin: 0 auto 2px; }
+      .balloon-slot > * { grid-area: 1 / 1; min-width: 0; }
+      /*
+       * キャラクター未選択・エラーなどのメッセージ用 ([hidden] のときは場所を取らない)。
+       * 検索吹き出しと同じ配色の吹き出しだが、ツノ (しっぽ) は付けず、角丸の四角形のまま。
+       * #balloon と高さを揃えるため中身を中央にそろえる。見出し (status-title) + 補足 (status-desc) の 2 段
+       */
+      .status[hidden] { display: none; }
+      .status {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        box-sizing: border-box;
+        padding: 8px 16px;
+        background: #ffff9a;
+        color: #000;
+        border: 2px solid #a0821e;
+        border-radius: 12px;
+        text-align: center;
+        font-family: "MS UI Gothic", "Yu Gothic UI", sans-serif;
+      }
+      .status-title { font-size: 18px; font-weight: bold; }
+      .status-desc { font-size: 13px; color: #6b5a1e; }
+      .status-desc:empty { display: none; }
+      /* メッセージが出ている間は、検索吹き出し (ツノ付き) を隠す。display ではなく visibility で隠し、マス目の高さには寄与させる */
+      #status:not([hidden]) ~ #balloon { visibility: hidden; pointer-events: none; }
 
       /*
        * 検索吹き出し。VSTO 版 SearchBalloonForm と同じ配色・寸法:
@@ -105,9 +149,6 @@
       .balloon {
         position: relative;
         box-sizing: border-box;
-        max-width: 390px;
-        /* しっぽ (高さ 14px) が本体の下に飛び出す分だけ下げて、先端をカイル君のすぐ上に置く */
-        margin: 0 auto 2px;
         padding: 8px 12px 10px;
         background: #ffff9a;
         color: #000;
@@ -185,18 +226,25 @@
     </div>
 
     <div id="dock">
-      <div class="balloon">
-        <div class="title">何について調べますか？</div>
-        <textarea id="query" maxlength="10000" title="本文を選択すると、その文字が薄く表示されます。Tab キーで挿入できます。" placeholder="ここに質問文を入力し、［検索］ をクリックしてください！"></textarea>
-        <div class="buttons">
-          <select id="engine" title="検索エンジン"></select>
-          <button id="search" type="button" title="Alt+S">検索(<u>S</u>)</button>
+      <!-- キャラクター未選択・エラーなどのメッセージが出ている間は、検索吹き出しの代わりにここに出す (高さは #balloon と揃う) -->
+      <div class="balloon-slot">
+        <div id="status" class="status" hidden>
+          <div id="status-title" class="status-title"></div>
+          <div id="status-desc" class="status-desc"></div>
         </div>
-        <svg class="tail" viewBox="0 0 22 16" aria-hidden="true">
-          <polygon points="0,0 18,0 21,16" fill="#ffff9a" />
-          <polyline points="0,0 21,16 18,0" fill="none" stroke="#a0821e" stroke-width="2" />
-          <line x1="1" y1="-1" x2="17" y2="-1" stroke="#ffff9a" stroke-width="3" />
-        </svg>
+        <div id="balloon" class="balloon">
+          <div class="title">何について調べますか？</div>
+          <textarea id="query" maxlength="10000" title="本文を選択すると、その文字が薄く表示されます。Tab キーで挿入できます。" placeholder="ここに質問文を入力し、［検索］ をクリックしてください！"></textarea>
+          <div class="buttons">
+            <select id="engine" title="検索エンジン"></select>
+            <button id="search" type="button" title="Alt+S">検索(<u>S</u>)</button>
+          </div>
+          <svg class="tail" viewBox="0 0 22 16" aria-hidden="true">
+            <polygon points="0,0 18,0 21,16" fill="#ffff9a" />
+            <polyline points="0,0 21,16 18,0" fill="none" stroke="#a0821e" stroke-width="2" />
+            <line x1="1" y1="-1" x2="17" y2="-1" stroke="#ffff9a" stroke-width="3" />
+          </svg>
+        </div>
       </div>
       <div class="stage-row">
         <!-- 左: キャラクター読み込み -->
@@ -230,8 +278,6 @@
         </div>
       </div>
 
-      <!-- カイル君の下: 状態メッセージ (未選択の案内・エラー) -->
-      <div id="status" class="status"></div>
     </div>
     <script type="module" src="/src/taskpane.ts"></script>
   </body>
