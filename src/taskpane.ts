@@ -1,5 +1,6 @@
 import { AcsPlayer } from "./acs/player";
 import { AcsCharacter } from "./acs/reader";
+import { watchWorksheetEvents } from "./excel";
 import { IdleController, isIdleName } from "./idle";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
@@ -197,6 +198,28 @@ const idle = new IdleController({
 idle.start();
 for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => idle.userActivity());
 
+// --- ドキュメント側のイベントへの反応 (Excel のシート操作など) ---
+/** 待機動作を自然に終わらせてから、候補の先頭に見つかったアニメーションを 1 つ再生する (入力中・検索中・他の再生中は何もしない) */
+function reactTo(...candidates: string[]) {
+  if (!player || !character || focused || thinking || userAnimationPlaying()) return;
+  const name = firstAnimation(...candidates);
+  if (!name) return;
+  void idle.interrupt().then(() => {
+    if (focused || thinking || userAnimationPlaying()) return;
+    void player?.play(name);
+  });
+}
+
+/** シート切り替えへの反応は、連続で切り替えられても騒がしくならないよう間隔を空ける */
+const SHEET_SWITCH_REACT_MIN_MS = 15_000;
+let lastSheetSwitchReactAt = 0;
+function onSheetActivated() {
+  const now = Date.now();
+  if (now - lastSheetSwitchReactAt < SHEET_SWITCH_REACT_MIN_MS) return;
+  lastSheetSwitchReactAt = now;
+  reactTo("GestureRight", "LookRight", "Alert", "GetAttention");
+}
+
 /** 読み込みが終わらないまま Thinking が続き続けないようにする上限 */
 const THINKING_MAX_MS = 20_000;
 let thinkingTimer: number | undefined;
@@ -382,6 +405,15 @@ void Office.onReady(async (info) => {
       }
     });
     showSelection();
+  }
+  if (info.host === Office.HostType.Excel) {
+    watchWorksheetEvents({
+      onAdded: () => reactTo("Congratulate", "Pleased", "Announce", "GetAttention"),
+      onDeleted: () => reactTo("Confused", "Decline", "Sad"),
+      onActivated: onSheetActivated,
+    }).catch((e: unknown) => {
+      status.textContent = `シート操作イベントを登録できません: ${(e as Error).message}`;
+    });
   }
 
   const saved = await loadCharacter().catch(() => undefined);
