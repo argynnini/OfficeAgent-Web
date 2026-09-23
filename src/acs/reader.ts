@@ -258,6 +258,14 @@ export class AcsCharacter {
 
     const loc = this.imageLocations[index];
     if (!loc) throw new Error(`画像 ${index} は存在しません`);
+    // 使われていない画像スロットは、ヘッダーにも満たないサイズ (実例: 1 byte) で入っていることがある。
+    // そのまま読むと、次の画像のデータにはみ出して幅・高さがでたらめな値になる (巨大確保でクラッシュする)
+    const MIN_HEADER_SIZE = 1 + 2 + 2 + 1 + 4; // skip(1) + width(u16) + height(u16) + compressed(u8) + dataSize(u32)
+    if (loc.size < MIN_HEADER_SIZE) {
+      const empty: AcsImage = { width: 0, height: 0, rgba: new Uint8ClampedArray(0) };
+      this.imageCache.set(index, empty);
+      return empty;
+    }
     const c = new Cursor(this.buf, loc.offset);
     c.skip(1);
     const width = c.u16();

@@ -163,8 +163,11 @@ export class AcsPlayer {
     c = document.createElement("canvas");
     c.width = img.width;
     c.height = img.height;
-    // 画像の数値も、同じ色空間として扱う (sRGB のキャンバスとの間で、変換が入らないようにする)
-    c.getContext("2d", { colorSpace: COLOR_SPACE })!.putImageData(new ImageData(img.rgba, img.width, img.height, { colorSpace: COLOR_SPACE }), 0, 0);
+    // 未使用のプレースホルダー (0x0) は、そのまま空の canvas にしておく (putImageData は 0 サイズだと例外になる)
+    if (img.width > 0 && img.height > 0) {
+      // 画像の数値も、同じ色空間として扱う (sRGB のキャンバスとの間で、変換が入らないようにする)
+      c.getContext("2d", { colorSpace: COLOR_SPACE })!.putImageData(new ImageData(img.rgba, img.width, img.height, { colorSpace: COLOR_SPACE }), 0, 0);
+    }
     this.sprites.set(index, c);
     return c;
   }
@@ -174,7 +177,9 @@ export class AcsPlayer {
     // 先頭の画像が最前面
     for (let i = frame.images.length - 1; i >= 0; i--) {
       const fi = frame.images[i]!;
-      this.ctx.drawImage(this.sprite(fi.imageIndex), fi.x, fi.y);
+      const s = this.sprite(fi.imageIndex);
+      if (s.width === 0 || s.height === 0) continue; // 未使用のプレースホルダー画像は描かない
+      this.ctx.drawImage(s, fi.x, fi.y);
     }
   }
 }
