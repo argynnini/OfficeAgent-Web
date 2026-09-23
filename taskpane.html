@@ -93,6 +93,43 @@
       .flyout:empty { display: none !important; }
       .flyout button { display: block; width: 100%; padding: 5px 12px; background: transparent; border: 0; border-radius: 8px; color: var(--menu-fg); font: 12px "Segoe UI", "Yu Gothic UI", sans-serif; text-align: left; white-space: nowrap; cursor: pointer; transition: background-color 0.1s ease; }
       .flyout button:hover, .flyout button:focus-visible { background: var(--menu-hover); outline: none; }
+      /* 設定 (Groq API キー) パネル: 再生メニューと違い、クリックで開閉する (入力欄なのでホバー開閉だと使いにくいため) */
+      .settings-wrap { position: relative; }
+      .settings-panel {
+        position: absolute;
+        left: 0;
+        bottom: 100%;
+        z-index: 10;
+        width: min(260px, calc(100vw - 32px));
+        margin-bottom: 8px;
+        padding: 10px;
+        box-sizing: border-box;
+        color-scheme: var(--menu-scheme);
+        background: var(--menu-bg);
+        color: var(--menu-fg);
+        border: 1px solid var(--menu-border);
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12), 0 10px 24px rgba(0, 0, 0, 0.22);
+        font: 12px "Segoe UI", "Yu Gothic UI", sans-serif;
+      }
+      .settings-panel[hidden] { display: none; }
+      .settings-panel label { display: block; margin: 10px 0 4px; font-weight: 600; }
+      .settings-panel label:first-child { margin-top: 0; }
+      /* 見出し行: ラベルの右側に、疎通確認の結果 (テキストのみ) を出す */
+      .settings-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 0; }
+      .settings-label-row label { margin: 0; }
+      .settings-label-row:first-child { margin-top: 0; }
+      .settings-panel input, .settings-panel select, .settings-panel textarea { width: 100%; box-sizing: border-box; padding: 5px 8px; margin-bottom: 6px; border: 1px solid var(--menu-border); border-radius: 6px; color: inherit; font: inherit; color-scheme: var(--menu-scheme); }
+      .settings-panel input, .settings-panel textarea { background: transparent; }
+      .settings-panel textarea { resize: vertical; }
+      /* select は background: transparent だと、開いた一覧 (ネイティブ描画) が color-scheme を無視して白くなるブラウザがあるため、はっきり色を付ける */
+      .settings-panel select { background: var(--menu-bg); }
+      .settings-panel select:disabled { opacity: 0.6; cursor: not-allowed; }
+      .settings-hint { margin: 0 0 8px; color: var(--btn-fg); line-height: 1.5; }
+      .settings-hint a { color: inherit; }
+      .settings-result { font-weight: normal; font-size: 11px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+      .settings-result[data-ok="true"] { color: #2a7a3b; }
+      .settings-result[data-ok="false"] { color: #b5342a; }
       /* 再生ボタン: 待機中は ▶、再生中は ■ */
       #play[data-playing="false"] .stop-icon, #play[data-playing="true"] .play-icon { display: none; }
       /* 絵文字のアイコン (OS の絵文字フォントで表示される) */
@@ -212,6 +249,19 @@
       .bar-btn:hover { background: rgba(0, 0, 0, 0.09); color: #111; }
       .bar-btn:focus-visible { outline: 2px solid #3b82f6; outline-offset: 1px; }
       .results iframe { flex: 1 1 auto; width: 100%; border: 0; background: #fff; }
+
+      /* Groq (AI) とのチャット表示。検索結果と同じ枠を使い回し、iframe の代わりに吹き出しのやり取りを積む */
+      .chat-messages[hidden] { display: none; }
+      /*
+       * min-height: 0 だけでは、body が min-height: 100% (高さ固定ではない) なせいで祖先の高さが
+       * そもそも制限されず、効かない。max-height を付けて、ここだけは確実にビューポート基準で頭打ちにする
+       */
+      .chat-messages { flex: 1 1 auto; min-height: 0; max-height: min(50vh, 420px); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+      .chat-msg { max-width: 85%; padding: 6px 10px; border-radius: 12px; line-height: 1.5; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+      .chat-msg.user { align-self: flex-end; background: #e8f0fe; color: #14315c; border-bottom-right-radius: 2px; }
+      .chat-msg.assistant { align-self: flex-start; background: #f1f1f0; color: #222; border-bottom-left-radius: 2px; }
+      .chat-msg.error { align-self: flex-start; background: #fdecea; color: #7a2a20; border-bottom-left-radius: 2px; }
+      .chat-msg.pending { color: #888; font-style: italic; }
     </style>
   </head>
   <body>
@@ -223,6 +273,7 @@
         <button id="results-close" type="button" class="bar-btn" title="結果を閉じる">×</button>
       </div>
       <iframe id="results-frame" title="検索結果" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <div id="chat-messages" class="chat-messages" hidden></div>
     </div>
 
     <div id="dock">
@@ -247,12 +298,36 @@
         </div>
       </div>
       <div class="stage-row">
-        <!-- 左: キャラクター読み込み -->
+        <!-- 左: キャラクター読み込み・設定 -->
         <div class="side-left">
+          <div class="side-row">
           <input id="file" type="file" accept=".acs" hidden />
           <button id="pick" type="button" class="icon-btn" title="キャラクターを選ぶ&#10;.acs ファイル (Microsoft Agent のキャラクター) を読み込みます。&#10;一度選ぶと、次回から自動で読み込みます。" aria-label="キャラクターを選ぶ">
             <span class="emoji" aria-hidden="true">🐬</span>
           </button>
+          <div class="settings-wrap">
+            <button id="settings" type="button" class="icon-btn" aria-haspopup="dialog" aria-expanded="false" aria-label="設定" title="設定&#10;Groq の API キーを登録します。">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M12 3.5l1 2.2 2.4-.4 1 2.2 2.3.7-.4 2.4 1.6 1.9-1.6 1.9.4 2.4-2.3.7-1 2.2-2.4-.4-1 2.2-1-2.2-2.4.4-1-2.2-2.3-.7.4-2.4L3.7 12l1.6-1.9-.4-2.4 2.3-.7 1-2.2 2.4.4z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div id="settings-panel" class="settings-panel" role="dialog" aria-label="設定" hidden>
+              <div class="settings-label-row">
+                <label for="groq-key">Groq API キー</label>
+                <span id="groq-test-result" class="settings-result" aria-live="polite"></span>
+              </div>
+              <input id="groq-key" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_..." title="ブラウザ内 (localStorage) に保存されます。" />
+              <p class="settings-hint"><a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">console.groq.com</a>で発行できます。</p>
+              <label for="groq-model">モデル</label>
+              <select id="groq-model" disabled title="質問に使うモデルを選びます。&#10;APIキーを登録すると一覧を取得します。">
+                <option value="">APIキーを登録するとモデル一覧を取得</option>
+              </select>
+              <label for="groq-persona">性格 (システムプロンプト)</label>
+              <textarea id="groq-persona" rows="3" spellcheck="false" title="AI の話し方・回答のルールを指定します。&#10;質問のたびに、これを先頭に付けて送ります。"></textarea>
+            </div>
+          </div>
+          </div>
         </div>
         <canvas id="stage" width="128" height="128" title="クリックでアニメーション"></canvas>
         <!-- 右: 効果音・再生 -->
