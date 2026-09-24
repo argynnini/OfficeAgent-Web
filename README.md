@@ -1,79 +1,138 @@
 # OfficeAgent-Web
 
-[OfficeAgent](https://github.com/argynnini/OfficeAgent)（VSTO 版カイル君）の Office.js アドイン版。
-Word / Excel / PowerPoint / Outlook の Web 版・Mac・モバイルにカイル君を登場させることを目指す実験的プロジェクト。  
-|デスクトップ(Windows)|Web|
-|:--:|:--:|
-|<img src="https://github.com/user-attachments/assets/5d0e85da-bb70-4c81-9a15-0b07e76b571c" />|<img src="https://github.com/user-attachments/assets/88a8143b-42b2-4d6d-8f0e-c2c27083a0e5" />|
+**あのカイル君を、もう一度 Office に。**
+
+[OfficeAgent](https://github.com/argynnini/OfficeAgent)（VSTO 版カイル君）の Office.js アドイン版です。
+Word / Excel / PowerPoint の作業ウィンドウにキャラクターを常駐させ、Web 版・Mac・Windows で動かすことを目指す実験的プロジェクトです。
+
+| デスクトップ (Windows) | Web |
+| :--: | :--: |
+| <img src="https://github.com/user-attachments/assets/5d0e85da-bb70-4c81-9a15-0b07e76b571c" /> | <img src="https://github.com/user-attachments/assets/88a8143b-42b2-4d6d-8f0e-c2c27083a0e5" /> |
+
+🌐 公開ページ: https://argynnini.github.io/OfficeAgent-Web/ （ブラウザだけで `.acs` を再生できます）
+
+## 目次
+
+- [特長](#特長)
+- [はじめかた](#はじめかた)
+- [キャラクターファイル (.acs) の入手](#キャラクターファイル-acs-の入手)
+- [機能](#機能)
+- [開発](#開発)
+- [実装状況とロードマップ](#実装状況とロードマップ)
+
+## 特長
+
+- 🎞️ **本物のアニメーション** — `.acs` をブラウザ内で解析し、canvas で再生します（分岐・終了分岐・効果音に対応）。
+- 🔎 **吹き出しからウェブ検索** — 本文で選択した文字をそのまま検索でき、結果を作業ウィンドウ内に表示します。
+- 💬 **AI に質問** — 自分の Groq API キーを登録すると、キャラクターが質問に答えます。
+- 👀 **操作に反応** — Word でコメントや段落を追加したり、Excel でシートを切り替えたりすると、キャラクターが反応します。
+- 🔒 **ファイルは手元だけ** — 選んだ `.acs` や API キーはブラウザの中に保存され、このアプリのサーバーには送られません。
+
+## はじめかた
+
+インストール作業は不要です。マニフェストを Office に読み込むだけで使えます。
+
+1. **マニフェストをダウンロードする**
+   [manifest.xml](https://argynnini.github.io/OfficeAgent-Web/manifest.xml) を保存します。
+2. **Office に読み込む**
+   - **Web 版**: [ホーム] > [アドイン] > [その他のアドイン] > [個人用アドイン] > [個人用アドインの管理] > [マイ アドインのアップロード] で、アドインのマニフェストとして `manifest.xml` を選びます。
+   - **デスクトップ版 (Windows)**: `manifest.xml` を置いた共有フォルダーを [信頼できるアドイン カタログ] に登録して読み込みます。
+3. **キャラクターを呼び出す**
+   [ホーム] タブの「OfficeAgent」グループにある「表示」を押すと、作業ウィンドウが開きます。
+   初回だけ、左下の 🐬 ボタンから `.acs` を選びます（[入手方法](#キャラクターファイル-acs-の入手)）。
+
+> [!NOTE]
+> キャラクターは `Greeting`（無いキャラクターは `Show`）のアニメーションで登場します。
+> 効果音は、ブラウザの制限により、作業ウィンドウを一度クリックするまで鳴りません。
 
 ## キャラクターファイル (.acs) の入手
 
-このリポジトリには、キャラクターファイル（`.acs`）は含まれていません（Microsoft のキャラクターで、再配布できないためです）。
-次のどちらかの方法で、自分で入手してください。
+キャラクターは このリポジトリには含まれていません。次のどちらかの方法で入手してください。
 
-- **Microsoft Office 2000 / XP (2001) / 2003 から入手する**（Office に付属していた Office アシスタントのキャラクター）
-- **[Agentpedia](https://agentpedia.tmafe.com/) などから入手する**
+- Microsoft Office 2000 / XP (2001) / 2003 に付属していた Office アシスタントのキャラクター
+- [Agentpedia](https://agentpedia.tmafe.com/) など
 
-入手した `.acs` は、ペイン左下の 🐬 ボタンから 1 回だけ選びます。選んだファイルはブラウザの中（IndexedDB）に保存され、次回から自動で読み込まれます。ファイルがサーバーに送られることはありません。
+選んだ `.acs` はブラウザの中（IndexedDB）に保存され、次回から自動で読み込まれます。公開ページと作業ウィンドウは同じ保存場所を使うので、どちらかで選べば両方に反映されます。
 
-## 方針
+## 機能
 
-- タスクペイン内にカイル君を常駐させる（デスクトップ版のように画面を歩き回ることは Office.js では不可）
-- `.acs` をブラウザで解析し canvas で再生する
-- AI 呼び出し（OpenAI / Groq）は API キー露出を避けるためプロキシ経由
+### ウェブ検索
 
-## プロトタイプの使い方
+吹き出しに入力して [検索(S)]（<kbd>Enter</kbd> / <kbd>Alt</kbd>+<kbd>S</kbd>）を押すと、選んだ検索エンジンで検索し、結果を作業ウィンドウ内に表示します。
+<kbd>Enter</kbd> で検索すると、入力欄のフォーカスが外れます。
+
+- **選択範囲を検索に使う**: 本文で文字を選択すると、吹き出しの入力欄に「[Tab]で挿入:」と薄く表示されます。入力欄が空のときに <kbd>Tab</kbd> を押すと挿入できます（この入力欄では、<kbd>Tab</kbd> でフォーカスは移動しません）。
+- **ブラウザで開く**: 結果パネルの「↗」で、ブラウザの別タブで開けます。
+- **検索エンジン**: Google / Wikipedia。
+
+> [!IMPORTANT]
+> 作業ウィンドウ内に表示できるのは、iframe への埋め込みを許す検索先だけです。
+> Google は非公式のパラメーター（`igu=1`）で表示しているだけなので、将来使えなくなったり、環境によっては確認画面（reCAPTCHA）が出たりします。
+> 検索結果のリンク先も、埋め込みを拒否するサイトが多く、作業ウィンドウ内に表示できないことがあります。
+> その場合は、結果パネル右上の「↗」で、ブラウザの別タブで開いてください。
+
+### AI に質問 (Groq)
+
+左下の ⚙ から Groq の API キー（[console.groq.com](https://console.groq.com/keys) で発行）を登録し、検索エンジンで「Groq」を選ぶと、[質問(S)] で AI とチャットできます。
+
+- API キーはブラウザの中（localStorage）にだけ保存され、ブラウザから Groq の API に直接送られます。
+- 使うモデルや、キャラクターの性格（システムプロンプト）を設定で変えられます。
+
+## 開発
+
+### セットアップ
 
 ```sh
 npm install
-npm run dev      # ブラウザで .acs を選択（またはドラッグ&ドロップ）して再生
-npm run dump -- path/to/Merlin.acs                      # 解析結果と全画像の展開チェック
-npx tsx scripts/render.ts path/to/Merlin.acs RestPose out.png   # 先頭フレームを PNG 出力
-```
-
-現状: ACS のパース（キャラクター情報・アニメーション・画像・効果音）、独自圧縮と ADPCM の展開、canvas での再生（分岐・終了分岐あり）まで。
-未対応: 口パク（overlay）、状態（States）。
-
-## Office に読み込む（開発用サイドロード）
-
-Office は HTTPS のアドインしか読み込まないため、最初に 1 回だけ開発用証明書を信頼させます（管理者確認のダイアログが出ます）。
-
-```sh
-npx office-addin-dev-certs install   # 初回のみ
+npx office-addin-dev-certs install   # 初回のみ。Office は HTTPS のアドインしか読み込まないため、開発用証明書を信頼させる（管理者確認のダイアログが出ます）
 npm run dev                          # https://localhost:3000 で起動
-npm run validate                     # manifest.xml の検証
 ```
 
-- **Web 版**: Word/Excel/PowerPoint on the web で、[挿入] > [アドイン] > [マイ アドイン] > [カスタム アドインのアップロード] から `manifest.xml` を選ぶ
-- **デスクトップ版 (Windows)**: `manifest.xml` を置いた共有フォルダを [信頼できるアドイン カタログ] に登録して読み込む
+`npm run dev` で開いたトップページでは、`.acs` を選択（またはドラッグ&ドロップ）してアニメーションを試せます。
 
-読み込むと [ホーム] タブの「OfficeAgent」グループに「表示」ボタンが出て、作業ウィンドウにキャラクターが表示されます。
-ペインを開くと、キャラクターは最初は見えない状態から、`Greeting`（無いキャラクターは `Show`）のアニメーションで登場します（効果音は、ブラウザの制限で、ペインを一度クリックするまで鳴りません）。
-`.acs` は再配布できないので、ペインの「キャラクターを選ぶ」で 1 回選ぶと IndexedDB に保存され、次回から自動で読み込まれます。
+### 開発版を Office に読み込む（サイドロード）
 
-## 本番公開 (GitHub Pages)
+プロジェクト直下の `manifest.xml`（`https://localhost:3000` を指す開発用）を、[はじめかた](#はじめかた)の手順 2 と同じ方法で読み込みます。
+開発用と本番用はアドイン ID を分けてあるので、両方を同じ Office に入れても衝突しません。
+
+### コマンド
+
+| コマンド | 内容 |
+| --- | --- |
+| `npm run dev` | 開発サーバーを起動 |
+| `npm run build` | 型チェックとビルド |
+| `npm run typecheck` | 型チェックのみ |
+| `npm run validate` | `manifest.xml` を検証 |
+| `npm run dump -- path/to/Merlin.acs` | 解析結果の表示と、全画像の展開チェック |
+| `npx tsx scripts/render.ts path/to/Merlin.acs RestPose out.png` | アニメーションの先頭フレームを PNG に出力 |
+
+### 本番公開 (GitHub Pages)
 
 master に push すると、GitHub Actions（`.github/workflows/deploy.yml`）が自動でビルドして GitHub Pages に公開します。
 
 - 公開先: `https://<ユーザー名>.github.io/OfficeAgent-Web/`
-- 本番用のマニフェスト: `https://<ユーザー名>.github.io/OfficeAgent-Web/manifest.xml`（`manifest.xml` の localhost を公開先の URL に置き換えたもの。`npm run build:pages` が `dist/manifest.xml` に生成します）
-- 本番用のアドイン ID は、開発用とは別にしてあるので、両方を同じ Office に入れても衝突しません。
+- 本番用のマニフェスト: `https://<ユーザー名>.github.io/OfficeAgent-Web/manifest.xml`
+  （`npm run build:pages` が、`manifest.xml` の localhost を公開先の URL に置き換えて `dist/manifest.xml` に生成します）
 - 初回だけ、リポジトリの Settings > Pages > Source を「GitHub Actions」にします。
-- ローカルで本番ビルドを試す: `SITE_URL=https://<ユーザー名>.github.io/OfficeAgent-Web npm run build:pages`
+- ローカルで本番ビルドを試す:
 
-## ウェブ検索
+  ```sh
+  SITE_URL=https://<ユーザー名>.github.io/OfficeAgent-Web npm run build:pages
+  ```
 
-吹き出しに入力して [検索(S)]（Enter / Alt+S。Enter で検索すると入力欄のフォーカスが外れます）で、選んだ検索エンジンで検索し、結果を作業ウィンドウ内に表示します。
+### 設計の方針
 
-- **検索エンジン**: Google / Wikipedia。iframe への埋め込みを拒否しない検索先だけを載せています（Yahoo! / YouTube / 楽天 / メルカリなどは拒否するため、ペインには出せません）。
-- Google は非公式のパラメーター（`igu=1`）で表示できるだけなので、いつ使えなくなるか、確認画面（reCAPTCHA）が出るかは、環境しだいです。
-- **本文の選択範囲を検索に使う**: 本文で文字を選択すると、その内容が吹き出しの入力欄に薄く（プレースホルダーとして）表示されます。先頭に「[Tab]で挿入:」と出て、入力欄が空のとき Tab キーで挿入できます（吹き出しの入力欄では、Tab でフォーカスは移動しません）。
-- 結果パネルの「↗」でブラウザで開けます。結果のリンク先は、埋め込みを拒否するサイトが多く、ペイン内に表示できないことがあります。
+- キャラクターは作業ウィンドウの中に常駐させる（デスクトップ版のように画面を歩き回ることは、Office.js ではできない）。
+- `.acs` はブラウザで解析し、canvas で再生する。サーバー側の処理は持たない。
 
-## ロードマップ
+## 実装状況とロードマップ
 
-1. ~~ACS パーサ + canvas 再生のプロトタイプ~~（済）
-2. ~~タスクペインに表示~~（済） / 吹き出しで AI に質問
+**対応済み**: ACS のパース（キャラクター情報・アニメーション・画像・効果音）、独自圧縮と ADPCM の展開、canvas での再生（分岐・終了分岐あり）、作業ウィンドウへの表示、ウェブ検索、Groq への質問、Word / Excel の操作に連動するアニメーション。
+
+**未対応**: 口パク（overlay）、状態（States）。
+
+1. ~~ACS パーサ + canvas 再生のプロトタイプ~~
+2. ~~タスクペインに表示 / 吹き出しで AI に質問~~
 3. 選択範囲の要約・翻訳・解説・誤字脱字チェック
-4. Excel シート追加や選択変更などのイベント連動アニメ
-5. Web Speech API によるノート読み上げ
+4. ~~Word / Excel の操作に連動するアニメーション（Word のコメント追加・削除と段落追加、Excel のシート切り替え）~~
+5. Web Speech API によるノートの読み上げ
