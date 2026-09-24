@@ -7,6 +7,7 @@ import { IdleController, isIdleName } from "./idle";
 import { marked } from "marked";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
+import { AI_TASKS, AiTask, DEFAULT_AI_TASK, findAiTask } from "./tasks";
 import { watchWordEvents } from "./word";
 
 marked.setOptions({ breaks: true, gfm: true });
@@ -161,15 +162,31 @@ const SUGGESTION_HINT = "[Tab]で挿入: ";
 /** 本文で選択中のテキスト (なければ空) */
 let suggestion = "";
 
+/** Groq に頼む作業 (質問・要約・翻訳…)。質問ボタンの ▾ で選び、次回も同じものを使う */
+const AI_TASK_KEY = "officeagent.aiTask";
+let currentTask: AiTask = DEFAULT_AI_TASK;
+try {
+  currentTask = findAiTask(localStorage.getItem(AI_TASK_KEY));
+} catch { /* 保存できない環境では既定 (質問) のまま */ }
+
+const isGroqSelected = () => engineSelect.value === GROQ_ENGINE_NAME;
+/** 質問以外 (要約・翻訳など) は、入力欄が空なら本文の選択範囲を対象にする */
+const usesSelection = () => isGroqSelected() && currentTask !== DEFAULT_AI_TASK;
+
 function defaultPlaceholder(): string {
-  return engineSelect.value === GROQ_ENGINE_NAME ? GROQ_PLACEHOLDER : SEARCH_PLACEHOLDER;
+  if (usesSelection()) {
+    return `本文を選択するか、ここに文章を入力して、［${currentTask.label}］をクリックしてください！`;
+  }
+  return isGroqSelected() ? GROQ_PLACEHOLDER : SEARCH_PLACEHOLDER;
 }
 
 function setSuggestion(text: string) {
   suggestion = text.trim();
   const flat = suggestion.replace(/\s+/g, " ");
   const shown = flat.length > PLACEHOLDER_MAX_CHARS ? flat.slice(0, PLACEHOLDER_MAX_CHARS) + "…" : flat;
-  queryInput.placeholder = flat ? SUGGESTION_HINT + shown : defaultPlaceholder();
+  // 要約などは、入力しなくても選択範囲がそのまま対象になるので、Tab の案内ではなくそのことを出す
+  const hint = usesSelection() ? `［${currentTask.label}］で選択範囲を${currentTask.label}: ` : SUGGESTION_HINT;
+  queryInput.placeholder = flat ? hint + shown : defaultPlaceholder();
   queryInput.classList.toggle("suggest", flat !== "");
 }
 
@@ -204,9 +221,14 @@ try {
 if (engineSelect.selectedIndex < 0) engineSelect.selectedIndex = 0;
 
 const searchButton = $<HTMLButtonElement>("search");
-/** Groq を選んでいる間は、ボタンの見た目とプレースホルダーを「検索」から「質問」にする */
+const taskToggle = $<HTMLButtonElement>("task-toggle");
+const taskMenu = $("task-menu");
+/** Groq を選んでいる間は、ボタンの見た目を「検索」から、選んでいる作業 (質問・要約…) にし、▾ を出す */
 function updateSearchButtonLabel() {
-  searchButton.innerHTML = engineSelect.value === GROQ_ENGINE_NAME ? "質問(<u>S</u>)" : "検索(<u>S</u>)";
+  const groq = isGroqSelected();
+  searchButton.innerHTML = `${groq ? currentTask.label : "検索"}(<u>S</u>)`;
+  taskToggle.hidden = !groq;
+  if (!groq) closeTaskMenu();
 }
 updateSearchButtonLabel();
 setSuggestion(suggestion);
@@ -217,6 +239,73 @@ engineSelect.addEventListener("change", () => {
   } catch { /* ignore */ }
   updateSearchButtonLabel();
   setSuggestion(suggestion);
+});
+
+// --- AI に頼む作業のメニュー (質問ボタンの ▾)。選ぶと作業を切り替えるだけで、送信はしない ---
+function renderTaskMenu() {
+  taskMenu.replaceChildren(
+    ...AI_TASKS.map((task) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.role = "menuitemradio";
+      b.dataset.task = task.id;
+      b.setAttribute("aria-checked", String(task === currentTask));
+      const label = document.createElement("span");
+      label.textContent = task.label;
+      const desc = document.createElement("span");
+      desc.className = "desc";
+      desc.textContent = task.description;
+      b.append(label, desc);
+      return b;
+    }),
+  );
+}
+
+function openTaskMenu() {
+  renderTaskMenu();
+  taskMenu.hidden = false;
+  taskToggle.setAttribute("aria-expanded", "true");
+  taskMenu.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+}
+
+function closeTaskMenu() {
+  taskMenu.hidden = true;
+  taskToggle.setAttribute("aria-expanded", "false");
+}
+
+function selectTask(task: AiTask) {
+  currentTask = task;
+  try {
+    localStorage.setItem(AI_TASK_KEY, task.id);
+  } catch { /* ignore */ }
+  closeTaskMenu();
+  updateSearchButtonLabel();
+  setSuggestion(suggestion);
+  // 選んだだけでは送らない (送信はボタン / Enter / Alt+S のときだけ)。ボタンにフォーカスを戻して、続けて押せるようにする
+  searchButton.focus();
+}
+
+taskToggle.addEventListener("click", () => (taskMenu.hidden ? openTaskMenu() : closeTaskMenu()));
+taskMenu.addEventListener("click", (e) => {
+  const id = (e.target as HTMLElement).closest<HTMLButtonElement>("button")?.dataset.task;
+  if (id) selectTask(findAiTask(id));
+});
+// ↑↓ で項目を移動、Esc で閉じて ▾ に戻る
+taskMenu.addEventListener("keydown", (e) => {
+  const items = Array.from(taskMenu.querySelectorAll<HTMLButtonElement>("button"));
+  const i = items.indexOf(document.activeElement as HTMLButtonElement);
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const next = (i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
+  } else if (e.key === "Escape") {
+    closeTaskMenu();
+    taskToggle.focus();
+  }
+});
+document.addEventListener("pointerdown", (e) => {
+  const t = e.target as Node;
+  if (!taskMenu.hidden && !taskMenu.contains(t) && !taskToggle.contains(t)) closeTaskMenu();
 });
 
 function drawRest() {
@@ -545,14 +634,19 @@ function showChat() {
   results.hidden = false;
 }
 
-async function askGroqChat(text: string) {
+/** チャットに表示する、自分の発言の最大文字数 (選択範囲が長くても、パネルが埋まらないように。送る内容は全文) */
+const CHAT_ECHO_MAX_CHARS = 200;
+
+/** text をそのまま、または作業 (要約など) の依頼文にして Groq に送る */
+async function askGroqChat(text: string, task: AiTask = DEFAULT_AI_TASK) {
   showChat();
-  addChatMessage("user", text);
+  const echo = text.length > CHAT_ECHO_MAX_CHARS ? text.slice(0, CHAT_ECHO_MAX_CHARS) + "…" : text;
+  addChatMessage("user", task === DEFAULT_AI_TASK ? text : `【${task.label}】${echo}`);
   const pending = addChatMessage("assistant pending", "考え中…");
   playThinking();
   searchPending = false; // iframe の onload 経由ではなく、この後 fetch の完了で直接 stopThinking する
 
-  const history = [...chatHistory, { role: "user" as const, content: text }];
+  const history = [...chatHistory, { role: "user" as const, content: task.build(text) }];
   const result = await askGroq(groqKeyInput.value.trim(), groqModelSelect.value, [groqSystemPrompt(), ...history]);
   pending.remove();
   if (result.ok) {
@@ -564,13 +658,19 @@ async function askGroqChat(text: string) {
   stopThinking(true);
 }
 
+/** Groq に渡す対象: 入力欄の文字。要約などで入力欄が空なら、本文の選択範囲 */
+function aiTarget(): string {
+  return queryInput.value.trim() || (usesSelection() ? suggestion : "");
+}
+
 function runSearch() {
-  const text = queryInput.value.trim();
-  if (!text) return;
-  if (engineSelect.value === GROQ_ENGINE_NAME) {
-    void askGroqChat(text);
+  if (isGroqSelected()) {
+    const target = aiTarget();
+    if (target) void askGroqChat(target, currentTask);
     return;
   }
+  const text = queryInput.value.trim();
+  if (!text) return;
   const engine = SEARCH_ENGINES.find((e) => e.name === engineSelect.value);
   if (!engine) return;
   playThinking();

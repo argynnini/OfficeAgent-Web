@@ -246,6 +246,21 @@
       }
       .balloon button:hover { background: #ffffc4; }
       .balloon button:active { background: #f0f07a; }
+      /*
+       * 分割ボタン: [質問(S)][▾]。▾ で、AI に頼む作業 (質問・要約・翻訳…) のメニューを上に開く。
+       * メニューも吹き出しと同じ VSTO 風の配色 (黄色 + 黒い枠) にする
+       */
+      .balloon .split { position: relative; display: flex; flex: 1; max-width: 96px; }
+      .balloon .split #search { max-width: none; min-width: 0; }
+      .balloon .split-toggle { flex: none; width: 18px; padding: 0; border-left: 0; font-size: 11px; }
+      .balloon .split-toggle[hidden] { display: none; }
+      .balloon .split-toggle[aria-expanded="true"] { background: #f0f07a; }
+      .task-menu { position: absolute; right: 0; bottom: calc(100% + 3px); z-index: 20; min-width: 190px; padding: 2px; background: #ffff9a; border: 1px solid #000; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25); }
+      .task-menu[hidden] { display: none; }
+      .balloon .task-menu button { display: flex; align-items: baseline; gap: 6px; width: 100%; max-width: none; height: auto; padding: 4px 8px 4px 20px; position: relative; border: 0; background: transparent; text-align: left; white-space: nowrap; }
+      .balloon .task-menu button:hover, .balloon .task-menu button:focus-visible { background: #f0f07a; outline: none; }
+      .task-menu button[aria-checked="true"]::before { content: "✓"; position: absolute; left: 6px; }
+      .task-menu .desc { color: #6b5a14; font-size: 11px; }
 
       /* 検索結果 (iframe) */
       .results { flex: 1 1 auto; min-height: 220px; display: flex; flex-direction: column; margin-bottom: 2px; border: 1px solid rgba(0, 0, 0, 0.10); border-radius: 12px; overflow: hidden; background: #fff; color: #000; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 14px rgba(0, 0, 0, 0.10); }
@@ -316,7 +331,12 @@
           <textarea id="query" maxlength="10000" title="本文を選択すると、その文字が薄く表示されます。Tab キーで挿入できます。" placeholder="ここに質問文を入力し、［検索］ をクリックしてください！"></textarea>
           <div class="buttons">
             <select id="engine" title="検索エンジン"></select>
-            <button id="search" type="button" title="Alt+S">検索(<u>S</u>)</button>
+            <!-- Groq を選んでいるときだけ ▾ を出し、質問・要約・翻訳などを選べる分割ボタンにする -->
+            <div class="split">
+              <button id="search" type="button" title="Alt+S">検索(<u>S</u>)</button>
+              <button id="task-toggle" type="button" class="split-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="task-menu" aria-label="AI に頼む作業を選ぶ" title="AI に頼む作業を選ぶ&#10;要約・翻訳などは、入力欄が空なら本文の選択範囲が対象になります。" hidden>▾</button>
+              <div id="task-menu" class="task-menu" role="menu" aria-label="AI に頼む作業" hidden></div>
+            </div>
           </div>
           <svg class="tail" viewBox="0 0 22 16" aria-hidden="true">
             <polygon points="0,0 18,0 21,16" fill="#ffff9a" />
