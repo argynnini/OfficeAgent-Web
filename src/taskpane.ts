@@ -1,6 +1,7 @@
 import { AcsPlayer } from "./acs/player";
 import { AcsCharacter } from "./acs/reader";
 import DOMPurify from "dompurify";
+import { watchWorksheetActivated } from "./excel";
 import { askGroq, GroqChatMessage, testGroqKey } from "./groq";
 import { IdleController, isIdleName } from "./idle";
 import { marked } from "marked";
@@ -264,7 +265,7 @@ for (const type of ["pointerdown", "keydown"]) {
   });
 }
 
-// --- ドキュメント側のイベントへの反応 (Word のコメント追加・削除、段落追加など) ---
+// --- ドキュメント側のイベントへの反応 (Word のコメント追加・削除、段落追加、Excel のシート切り替えなど) ---
 /** 待機動作を自然に終わらせてから、候補の先頭に見つかったアニメーションを 1 つ再生する (入力中・検索中・他の再生中は何もしない) */
 function reactTo(...candidates: string[]) {
   if (!player || !character || focused || thinking || userAnimationPlaying()) return;
@@ -290,6 +291,9 @@ function throttled(minMs: number, fn: () => void): () => void {
 const REACT_THROTTLE_MS = 15_000;
 /** 段落追加 (Enter で新しい段落) は書いている間ずっと発火するので間引く */
 const onParagraphAdded = throttled(REACT_THROTTLE_MS, () => reactTo("Acknowledge", "GestureDown", "LookDown", "GetAttention"));
+
+/** シート切り替えも、連続で切り替えられても騒がしくならないよう間引く */
+const onSheetActivated = throttled(REACT_THROTTLE_MS, () => reactTo("GestureRight", "LookRight", "Alert", "GetAttention"));
 
 /** 読み込みが終わらないまま Thinking が続き続けないようにする上限 */
 const THINKING_MAX_MS = 20_000;
@@ -789,6 +793,11 @@ void Office.onReady(async (info) => {
       onParagraphAdded,
     }).catch((e: unknown) => {
       setStatus(`コメント・段落イベントを登録できません: ${(e as Error).message}`);
+    });
+  }
+  if (info.host === Office.HostType.Excel) {
+    watchWorksheetActivated(onSheetActivated).catch((e: unknown) => {
+      setStatus(`シート切り替えイベントを登録できません: ${(e as Error).message}`);
     });
   }
 
