@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OfficeAgent Web</title>
-    <meta name="description" content="Office にキャラクターを呼び出して、ウェブ検索などを手伝ってもらう Office アドイン。.acs キャラクターをブラウザで再生できます。" />
+    <meta name="description" content="Office にキャラクターを呼び出して、ウェブ検索などを手伝ってもらう Office アドイン。.acs (Microsoft Agent) と .act (Office 97 のアシスタント) のキャラクターをブラウザで再生できます。" />
     <link rel="icon" type="image/png" href="/assets/icon-32.png" />
     <style>
       /*
@@ -101,6 +101,8 @@
       .toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
       .toolbar .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--muted); }
       .toolbar .name strong { color: var(--fg); }
+      /* 形式 (ACS / ACT) の小さな札 */
+      .format { display: inline-block; margin-left: 2px; padding: 0 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; line-height: 1.6; vertical-align: 1px; }
       /* キャラクターのタスクトレイ用アイコン (16x16 のドット絵) */
       .char-icon { width: 16px; height: 16px; image-rendering: pixelated; }
       .char-icon[hidden], #pick-emoji[hidden] { display: none; }
@@ -168,7 +170,7 @@
           <p class="eyebrow">Office.js アドイン · 実験的プロジェクト</p>
           <h1>あのカイル君を、<br />もう一度 Office に。</h1>
           <p class="lead">
-            Microsoft Agent のキャラクター (.acs) をブラウザだけで再生し、Word / Excel / PowerPoint の作業ウィンドウに常駐させます。
+            Microsoft Agent のキャラクター (.acs) や Office 97 のアシスタント (.act) をブラウザだけで再生し、Word / Excel / PowerPoint の作業ウィンドウに常駐させます。
             Web 版・Mac・Windows で動きます。
           </p>
           <div class="cta">
@@ -177,12 +179,12 @@
           </div>
         </div>
 
-        <!-- プレイヤー: .acs をここで試せる -->
+        <!-- プレイヤー: .acs / .act をここで試せる -->
         <div class="player" aria-label="キャラクター プレイヤー">
           <div class="stage" id="drop">
             <div id="balloon" class="balloon">
               <div id="balloon-text" aria-live="polite">
-                <b>.acs ファイル</b>をここにドラッグ&amp;ドロップするか、<br />下の 🐬 を押して選んでください。
+                <b>.acs / .act ファイル</b>をここにドラッグ&amp;ドロップするか、<br />下の 🐬 を押して選んでください。
               </div>
               <button id="balloon-close" class="balloon-close" type="button" title="吹き出しを閉じる" aria-label="吹き出しを閉じる">×</button>
             </div>
@@ -196,7 +198,7 @@
             <div class="drop-hint">ここにドロップ</div>
           </div>
           <div class="toolbar">
-            <input id="file" type="file" accept=".acs" hidden />
+            <input id="file" type="file" accept=".acs,.act" hidden />
             <button id="pick" class="icon-btn" type="button" title="キャラクターを選ぶ&#10;右クリックで、キャラクターを外します。" aria-label="キャラクターを選ぶ">
               <span id="pick-emoji" aria-hidden="true">🐬</span>
               <!-- 読み込んだキャラクターにタスクトレイ用アイコンがあれば、🐬 の代わりに出す -->
@@ -234,7 +236,7 @@
             <div class="card">
               <div class="icon">🎞️</div>
               <h3>本物のアニメーション</h3>
-              <p>.acs をブラウザ内で解析して canvas に描画。分岐・終了分岐・効果音まで再生し、アイドル中も気ままに動きます。</p>
+              <p>.acs も、Office 97 のアシスタントの .act も、ブラウザ内で解析して canvas に描画。分岐・効果音まで再生し、アイドル中も気ままに動きます。</p>
             </div>
             <div class="card">
               <div class="icon">🔎</div>
@@ -249,7 +251,7 @@
             <div class="card">
               <div class="icon">🔒</div>
               <h3>ファイルは手元だけ</h3>
-              <p>選んだ .acs はブラウザの中 (IndexedDB) に保存され、サーバーには送られません。次回からは自動で読み込みます。</p>
+              <p>選んだ .acs / .act はブラウザの中 (IndexedDB) に保存され、サーバーには送られません。次回からは自動で読み込みます。</p>
             </div>
           </div>
         </div>
@@ -271,13 +273,13 @@
             </li>
             <li>
               <strong>[ホーム] タブの「表示」を押す</strong>
-              <p>作業ウィンドウが開いたら、左下の 🐬 から .acs を 1 回だけ選びます。</p>
+              <p>作業ウィンドウが開いたら、左下の 🐬 から .acs か .act を 1 回だけ選びます。</p>
             </li>
           </ol>
           <div class="note">
-            <strong>.acs ファイルについて:</strong>
+            <strong>.acs / .act ファイルについて:</strong>
             キャラクターは Microsoft のもので再配布できないため、同梱していません。
-            Office 2000 / XP / 2003 に付属していたものか、<a href="https://agentpedia.tmafe.com/" target="_blank" rel="noopener noreferrer">Agentpedia</a> などから入手してください。
+            .acs は Office 2000 / XP / 2003 に、.act は Office 97 に付属していたものか、<a href="https://agentpedia.tmafe.com/" target="_blank" rel="noopener noreferrer">Agentpedia</a> などから入手してください。
           </div>
         </div>
       </section>

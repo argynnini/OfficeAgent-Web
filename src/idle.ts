@@ -1,5 +1,5 @@
 import type { AcsPlayer } from "./acs/player";
-import type { AcsCharacter } from "./acs/reader";
+import type { Character } from "./character";
 
 /** 待機中 (放置中) に再生する動きの名前。Merlin: Idle1_1 など / クリッピー: IdleSnooze など / イルカ: Idle(3), DeepIdle1 */
 const IDLE_NAME = /^(Idle|DeepIdle)/i;
@@ -17,7 +17,7 @@ const INTERRUPT_WAIT_MS = 1_500;
 export const isIdleName = (name: string | undefined): boolean => name !== undefined && IDLE_NAME.test(name);
 
 /** 状態の一覧 (IdlingLevel1〜3) に割り当てられた待機動作。無いキャラクターは空 */
-function idleStates(character: AcsCharacter): string[][] {
+function idleStates(character: Character): string[][] {
   return [1, 2, 3].map((level) => character.stateAnimations(`IdlingLevel${level}`));
 }
 
@@ -25,7 +25,7 @@ function idleStates(character: AcsCharacter): string[][] {
  * 待機動作かどうか。状態の一覧に割り当てられているもの (Blink や Sleep など、名前が Idle で始まらないものも含む) と、
  * 名前が Idle / DeepIdle で始まるもの
  */
-export function isIdleAnimation(character: AcsCharacter | undefined, name: string | undefined): boolean {
+export function isIdleAnimation(character: Character | undefined, name: string | undefined): boolean {
   if (name === undefined) return false;
   return isIdleName(name) || (!!character && idleStates(character).some((names) => names.includes(name)));
 }
@@ -57,7 +57,7 @@ export function pickIdle(names: Iterable<string>, maxLevel: number, last?: strin
  * (その段階が無ければ、より浅い段階から)、無ければ名前から推測する (pickIdle)。選んだ動作と、その段階を返す
  */
 export function pickIdleFor(
-  character: AcsCharacter,
+  character: Character,
   maxLevel: number,
   last?: string,
   random = Math.random,
@@ -78,7 +78,7 @@ export function pickIdleFor(
 
 export interface IdleDeps {
   player: () => AcsPlayer | undefined;
-  character: () => AcsCharacter | undefined;
+  character: () => Character | undefined;
   /** 入力中・検索中など、待機動作を始めてはいけない状態 */
   busy: () => boolean;
 }

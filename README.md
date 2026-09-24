@@ -9,7 +9,7 @@ Word / Excel / PowerPoint の作業ウィンドウにキャラクターを常駐
 | :--: | :--: |
 | <img src="https://github.com/user-attachments/assets/5d0e85da-bb70-4c81-9a15-0b07e76b571c" /> | <img src="https://github.com/user-attachments/assets/88a8143b-42b2-4d6d-8f0e-c2c27083a0e5" /> |
 
-🌐 公開ページ: https://argynnini.github.io/OfficeAgent-Web/ （ブラウザだけで `.acs` を再生できます）
+🌐 公開ページ: https://argynnini.github.io/OfficeAgent-Web/ （ブラウザだけで `.acs` と、Office 97 のアシスタントの `.act` を再生できます）
 
 ## 目次
 
@@ -39,7 +39,7 @@ Word / Excel / PowerPoint の作業ウィンドウにキャラクターを常駐
    - **デスクトップ版 (Windows)**: `manifest.xml` を置いた共有フォルダーを [信頼できるアドイン カタログ] に登録して読み込みます。
 3. **キャラクターを呼び出す**
    [ホーム] タブの「OfficeAgent」グループにある「表示」を押すと、作業ウィンドウが開きます。
-   初回だけ、左下の 🐬 ボタンから `.acs` を選びます（[入手方法](#キャラクターファイル-acs-の入手)）。
+   初回だけ、左下の 🐬 ボタンから `.acs`（または Office 97 のアシスタントの `.act`）を選びます（[入手方法](#キャラクターファイル-acs-の入手)）。
 
 > [!NOTE]
 > キャラクターは `Greeting`（無いキャラクターは `Show`）のアニメーションで登場します。
@@ -139,6 +139,8 @@ master に push すると、GitHub Actions（`.github/workflows/deploy.yml`）�
 ## 実装状況とロードマップ
 
 **対応済み**: ACS のパース（キャラクター情報・アニメーション・画像・効果音・タスクトレイ用アイコン・状態）、独自圧縮と ADPCM の展開、canvas での再生（分岐・終了分岐あり）、作業ウィンドウへの表示、ウェブ検索、Groq への質問と選択範囲の要約・翻訳・解説・校正、Word / Excel の操作に連動するアニメーション。
+
+**Office 97 のアシスタント（`.act`）**: 形式は公開されていないため、実ファイル（ロッキー、カイル（Office 97 版））を解析して読んでいます。ラスター画像（ACS と同じ圧縮 + ランレングス。色は Windows のハーフトーン パレット）、ベクター画像（WMF）、合成コマ、効果音、アニメーション（命令の列: 画像・確率つき分岐・効果音）、アニメーションの種類（Office の `msoAnimationType` の番号）、名前と紹介文。作業ウィンドウでも公開ページのデモでも、`.acs` と同じように選んで使えます（口パク・声の設定・タスクトレイ用アイコンは、ACT に無いので使えません）。
 
 **未対応**: 作業ウィンドウでの読み上げと口パク（公開ページのデモでは、入力した言葉をブラウザの音声合成でしゃべらせ、口の画像（overlay）で口パクできます）。状態（States）は、登場（Showing）・待機動作（IdlingLevel1〜3）・デモの読み上げ中の動き（Speaking）で使っています（Moving・Listening などは、対応する機能がまだないので未使用）。
 

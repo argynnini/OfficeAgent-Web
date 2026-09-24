@@ -20,6 +20,9 @@ export interface FrameImage {
   imageIndex: number;
   x: number;
   y: number;
+  /** 描く大きさ (省略時は画像そのままの大きさ)。ACT の合成コマで、範囲に合わせて拡大・縮小するときに使う */
+  width?: number;
+  height?: number;
 }
 
 export interface Branch {

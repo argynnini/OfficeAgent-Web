@@ -1,6 +1,8 @@
 import { AcsPlayer } from "./acs/player";
 import { imageToDataUrl } from "./acs/icon";
 import { AcsCharacter } from "./acs/reader";
+import { ActCharacter, isActFile } from "./act/reader";
+import type { Character } from "./character";
 import { IdleController, isIdleAnimation } from "./idle";
 import { Speaker, voiceParams } from "./speak";
 import { deleteCharacter, loadCharacter, saveCharacter } from "./store";
@@ -31,7 +33,7 @@ const speakButton = document.getElementById("speak-button") as HTMLButtonElement
 const SIZE_KEY = "officeagent.demoSize";
 
 let player: AcsPlayer | undefined;
-let character: AcsCharacter | undefined;
+let character: Character | undefined;
 let names: string[] = [];
 /** 最後に選んだアニメーション (再生ボタンで繰り返す) */
 let selected: string | undefined;
@@ -159,7 +161,9 @@ function unload() {
 async function open(fileName: string, data: ArrayBuffer, save: boolean) {
   say(`<b>${escape(fileName)}</b> を読み込み中…`);
   try {
-    const next = new AcsCharacter(data);
+    // Office 97 のアシスタント (.act) か、Microsoft Agent のキャラクター (.acs) か
+    const act = isActFile(data);
+    const next: Character = act ? new ActCharacter(data) : new AcsCharacter(data);
     speaker.cancel();
     leavingPlayer?.stop();
     leavingPlayer = undefined;
@@ -189,13 +193,17 @@ async function open(fileName: string, data: ArrayBuffer, save: boolean) {
     playButton.disabled = false;
     applySize();
 
-    const title = next.name ?? fileName.replace(/\.acs$/i, "");
+    const title = next.name ?? fileName.replace(/\.ac[st]$/i, "");
     // キャラクターのタスクトレイ用アイコンがあれば、選ぶボタンの 🐬 の代わりと、ブラウザのタブに出す (作業ウィンドウと同じ)
     const icon = next.trayIcon && imageToDataUrl(next.trayIcon);
     if (icon) pickIcon.src = icon;
     pickIcon.hidden = !icon;
     pickEmoji.hidden = !!icon;
-    nameLabel.innerHTML = `<strong>${escape(title)}</strong> · ${next.width}×${next.height} · ${names.length} アニメーション`;
+    // 形式 (ACS = Microsoft Agent / ACT = Office 97 のアシスタント) も並べて出す
+    const format = act
+      ? `<span class="format" title="Office 97 のアシスタント (.act)">ACT</span>`
+      : `<span class="format" title="Microsoft Agent のキャラクター (.acs)">ACS</span>`;
+    nameLabel.innerHTML = `<strong>${escape(title)}</strong> ${format} · ${next.width}×${next.height} · ${names.length} アニメーション`;
     if (faviconLink) faviconLink.href = icon || DEFAULT_FAVICON;
     nameLabel.title = fileName;
     say(
@@ -342,7 +350,7 @@ function selfIntroduction(): string {
   if (!character) return "";
   const description = character.description?.trim();
   if (description) return description;
-  const name = character.name ?? nameLabel.title.replace(/\.acs$/i, "");
+  const name = character.name ?? nameLabel.title.replace(/\.ac[st]$/i, "");
   return `こんにちは、${name}です。`;
 }
 

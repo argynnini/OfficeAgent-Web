@@ -1,5 +1,6 @@
 import { decodeWav } from "./wav";
-import type { AcsCharacter, Animation, Frame } from "./reader";
+import type { Character } from "../character";
+import type { Animation, Frame } from "./reader";
 
 /**
  * 描画の色空間。ACS の色は、Windows (GDI) では、色の変換なしで、そのまま画面に出る (本家 = VSTO 版の見た目)。
@@ -41,7 +42,7 @@ export class AcsPlayer {
   private lastFrame: Frame | undefined;
 
   constructor(
-    private readonly character: AcsCharacter,
+    private readonly character: Character,
     private readonly canvas: HTMLCanvasElement,
   ) {
     canvas.width = character.width;
@@ -49,6 +50,8 @@ export class AcsPlayer {
     // 当たり判定 (hitTest) で画素を読み出すので、読み出し向けにしておく (キャラクターは小さいので描画の速さは気にならない)
     const ctx = canvas.getContext("2d", { colorSpace: COLOR_SPACE, willReadFrequently: true });
     if (!ctx) throw new Error("canvas 2d を取得できません");
+    // 画像を拡大・縮小して描くとき (ACT の合成コマ) も、ドット絵をぼかさない
+    ctx.imageSmoothingEnabled = false;
     this.ctx = ctx;
   }
 
@@ -119,10 +122,12 @@ export class AcsPlayer {
         if (!frame) return resolve();
         // 終了分岐が循環しても終わるように上限を設ける
         if (this.releasing && ++releasedSteps > anim.frames.length * 3) return resolve();
-        this.draw(frame);
+        // 画像なし・0 秒のフレームは、描かずにすぐ次へ (ACT の分岐・効果音の命令。描くと一瞬消えてちらつく)
+        const drawn = frame.images.length > 0 || frame.duration > 0;
+        if (drawn) this.draw(frame);
         if (frame.soundIndex >= 0) void this.playSound(frame.soundIndex);
         const next = this.nextIndex(frame, index);
-        this.timer = window.setTimeout(() => step(next), Math.max(frame.duration, 10));
+        this.timer = window.setTimeout(() => step(next), drawn ? Math.max(frame.duration, 10) : 0);
       };
       step(0);
     });
@@ -221,7 +226,11 @@ export class AcsPlayer {
       const fi = frame.images[i]!;
       const s = this.sprite(fi.imageIndex);
       if (s.width === 0 || s.height === 0) continue; // 未使用のプレースホルダー画像は描かない
-      this.ctx.drawImage(s, fi.x, fi.y);
+      if (fi.width !== undefined && fi.height !== undefined && (fi.width !== s.width || fi.height !== s.height)) {
+        this.ctx.drawImage(s, fi.x, fi.y, fi.width, fi.height);
+      } else {
+        this.ctx.drawImage(s, fi.x, fi.y);
+      }
     }
     if (mouth) {
       const s = this.sprite(mouth.imageIndex);

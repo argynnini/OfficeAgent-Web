@@ -1,6 +1,8 @@
 import { AcsPlayer } from "./acs/player";
 import { imageToDataUrl } from "./acs/icon";
 import { AcsCharacter } from "./acs/reader";
+import { ActCharacter, isActFile } from "./act/reader";
+import type { Character } from "./character";
 import DOMPurify from "dompurify";
 import { watchWorksheetActivated } from "./excel";
 import { askGroq, GroqChatMessage, testGroqKey } from "./groq";
@@ -54,7 +56,7 @@ function renderSoundButton() {
 renderSoundButton();
 
 let player: AcsPlayer | undefined;
-let character: AcsCharacter | undefined;
+let character: Character | undefined;
 /** 性格リセット用に覚えておく、現在のキャラクターの表示名 */
 let currentCharacterDisplayName: string | undefined;
 
@@ -119,7 +121,7 @@ function unloadCharacter() {
   pickEmoji.hidden = false;
   renderPlayButton(false);
   updateCharacterRequiredUi();
-  setStatus("キャラクターファイルを選択してください。", "🐬をクリックして、Microsoft Agent キャラクターファイル (.acs) を選択してください");
+  setStatus("キャラクターファイルを選択してください。", "🐬をクリックして、Microsoft Agent のキャラクター (.acs) か、Office 97 のアシスタント (.act) を選択してください");
   void deleteCharacter().catch(() => undefined);
 
   leavingPlayer = leaving;
@@ -137,7 +139,8 @@ function useCharacter(data: ArrayBuffer, name: string) {
   leavingPlayer?.stop();
   leavingPlayer = undefined;
   player?.stop();
-  character = new AcsCharacter(data);
+  // Microsoft Agent のキャラクター (.acs) か、Office 97 のアシスタント (.act) か
+  character = isActFile(data) ? new ActCharacter(data) : new AcsCharacter(data);
   player = new AcsPlayer(character, canvas);
   player.soundEnabled = soundOn;
   // 既にクリックなどの操作が済んでいれば (例: キャラを選ぶ前に何か触っていた場合)、ここで先に再開しておく
@@ -967,6 +970,6 @@ void Office.onReady(async (info) => {
       setStatus("保存済みキャラクターを読み込めませんでした。もう一度選んでください。");
     }
   } else {
-    setStatus("キャラクターファイルを選択してください。", "🐬をクリックして、Microsoft Agent キャラクターファイル (.acs) を選択してください");
+    setStatus("キャラクターファイルを選択してください。", "🐬をクリックして、Microsoft Agent のキャラクター (.acs) か、Office 97 のアシスタント (.act) を選択してください");
   }
 });
