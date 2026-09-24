@@ -1,6 +1,7 @@
 import { AcsPlayer } from "./acs/player";
+import { imageToDataUrl } from "./acs/icon";
 import { AcsCharacter } from "./acs/reader";
-import { isIdleName } from "./idle";
+import { IdleController, isIdleAnimation } from "./idle";
 import { loadCharacter, saveCharacter } from "./store";
 
 const fileInput = document.getElementById("file") as HTMLInputElement;
@@ -10,15 +11,20 @@ const playButton = document.getElementById("play") as HTMLButtonElement;
 const soundButton = document.getElementById("sound") as HTMLButtonElement;
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
 const balloon = document.getElementById("balloon") as HTMLElement;
+const balloonText = document.getElementById("balloon-text") as HTMLElement;
+const balloonClose = document.getElementById("balloon-close") as HTMLButtonElement;
+const sizeRow = document.getElementById("size-row") as HTMLElement;
+const sizeInput = document.getElementById("size") as HTMLInputElement;
+const sizeValue = document.getElementById("size-value") as HTMLOutputElement;
 const nameLabel = document.getElementById("name") as HTMLElement;
+const pickIcon = document.getElementById("pick-icon") as HTMLImageElement;
+const pickEmoji = document.getElementById("pick-emoji") as HTMLElement;
 const animsPanel = document.getElementById("anims") as HTMLElement;
 const filter = document.getElementById("filter") as HTMLInputElement;
 const animList = document.getElementById("anim-list") as HTMLElement;
 
-/** 表示倍率の上限。ドット絵なので整数倍で拡大する (image-rendering: pixelated) */
-const MAX_SCALE = 2;
-/** ステージの左右の余白 (拡大しても、小さい画面ではみ出さないように差し引く) */
-const STAGE_PADDING = 32;
+/** キャラクターの表示倍率 (%) を覚えておく。ステージより大きくなる分は CSS (max-width: 100%) で縮める */
+const SIZE_KEY = "officeagent.demoSize";
 
 let player: AcsPlayer | undefined;
 let character: AcsCharacter | undefined;
@@ -26,20 +32,41 @@ let names: string[] = [];
 /** 最後に選んだアニメーション (再生ボタンで繰り返す) */
 let selected: string | undefined;
 
+/** 吹き出しにメッセージを出す (× で閉じていても、新しいメッセージでまた出す) */
 function say(html: string, error = false) {
-  balloon.innerHTML = html;
+  balloonText.innerHTML = html;
   balloon.dataset.error = String(error);
+  balloon.hidden = false;
 }
+
+/** 既定の favicon (キャラクターにアイコンが無ければこれに戻す) */
+const faviconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+const DEFAULT_FAVICON = faviconLink?.href ?? "";
 
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** 画面幅に収まる整数倍で表示する */
-function fitCanvas() {
-  if (!character) return;
-  const room = (canvas.parentElement?.clientWidth ?? character.width) - STAGE_PADDING;
-  const scale = Math.max(1, Math.min(MAX_SCALE, Math.floor(room / character.width)));
-  canvas.style.width = `${character.width * scale}px`;
+/** スライダーの倍率で表示する (ドット絵なので image-rendering: pixelated で拡大) */
+function applySize() {
+  const percent = Number(sizeInput.value);
+  sizeValue.value = `${percent}%`;
+  if (character) canvas.style.width = `${Math.round((character.width * percent) / 100)}px`;
 }
+
+try {
+  const saved = localStorage.getItem(SIZE_KEY);
+  if (saved) sizeInput.value = saved;
+} catch { /* 保存できない環境では既定のまま */ }
+
+/** 待機動作 (Idle) の再生中は、再生ボタンを「停止」にせず、一覧でも強調しない (作業ウィンドウと同じ) */
+const userAnimationPlaying = () => !!player?.isPlaying && !isIdleAnimation(character, player.currentAnimation);
+
+// 放置すると、ときどき待機動作を再生する (放置が長いほど深い動き。作業ウィンドウと同じ)
+const idle = new IdleController({
+  player: () => player,
+  character: () => character,
+  busy: () => false,
+});
+idle.start();
 
 function renderList() {
   const q = filter.value.trim().toLowerCase();
@@ -59,14 +86,14 @@ function renderList() {
       b.role = "listitem";
       b.textContent = n;
       b.dataset.name = n;
-      b.setAttribute("aria-current", String(n === player?.currentAnimation));
+      b.setAttribute("aria-current", String(userAnimationPlaying() && n === player?.currentAnimation));
       return b;
     }),
   );
 }
 
 function markCurrent() {
-  const current = player?.currentAnimation;
+  const current = userAnimationPlaying() ? player?.currentAnimation : undefined;
   animList.querySelectorAll<HTMLButtonElement>(".anim").forEach((b) => {
     b.setAttribute("aria-current", String(b.dataset.name === current));
   });
@@ -88,10 +115,14 @@ async function open(fileName: string, data: ArrayBuffer, save: boolean) {
     player = new AcsPlayer(next, canvas);
     player.soundEnabled = soundButton.getAttribute("aria-pressed") === "true";
     player.onPlayingChange = (playing) => {
-      playButton.dataset.playing = String(playing);
-      playButton.title = playButton.ariaLabel = playing ? "停止" : "再生";
+      const user = playing && userAnimationPlaying();
+      playButton.dataset.playing = String(user);
+      playButton.title = playButton.ariaLabel = user ? "停止" : "再生";
       markCurrent();
+      if (!playing) idle.animationEnded();
     };
+    // 読み込んだ時点から放置時間を数え直す (直後から深い待機動作が出ないように)
+    idle.userActivity();
 
     names = [...next.animations.keys()].sort((a, b) => a.localeCompare(b));
     filter.value = "";
@@ -100,11 +131,18 @@ async function open(fileName: string, data: ArrayBuffer, save: boolean) {
     canvas.hidden = false;
     emptyButton.hidden = true;
     animsPanel.hidden = false;
+    sizeRow.hidden = false;
     playButton.disabled = false;
-    fitCanvas();
+    applySize();
 
     const title = next.name ?? fileName.replace(/\.acs$/i, "");
+    // キャラクターのタスクトレイ用アイコンがあれば、選ぶボタンの 🐬 の代わりと、ブラウザのタブに出す (作業ウィンドウと同じ)
+    const icon = next.trayIcon && imageToDataUrl(next.trayIcon);
+    if (icon) pickIcon.src = icon;
+    pickIcon.hidden = !icon;
+    pickEmoji.hidden = !!icon;
     nameLabel.innerHTML = `<strong>${escape(title)}</strong> · ${next.width}×${next.height} · ${names.length} アニメーション`;
+    if (faviconLink) faviconLink.href = icon || DEFAULT_FAVICON;
     nameLabel.title = fileName;
     say(
       next.description
@@ -114,8 +152,8 @@ async function open(fileName: string, data: ArrayBuffer, save: boolean) {
 
     if (save) await saveCharacter(fileName, data).catch(() => undefined);
 
-    // 登場アニメがあれば再生し、なければ待機姿勢を描く
-    const entrance = ["Greeting", "Show"].find((n) => next.animations.has(n));
+    // 登場アニメ (Greeting → Showing 状態の割り当て → Show) があれば再生し、なければ待機姿勢を描く
+    const entrance = ["Greeting", ...next.stateAnimations("Showing"), "Show"].find((n) => next.animations.has(n));
     if (entrance) {
       selected = entrance;
       void player.play(entrance);
@@ -180,13 +218,13 @@ filter.addEventListener("keydown", (e) => {
 
 playButton.addEventListener("click", () => {
   if (!player) return;
-  if (player.isPlaying) return void player.release();
+  if (userAnimationPlaying()) return void player.release();
   if (selected) play(selected);
 });
 
 // キャラクターをクリック: 待機以外のアニメーションをランダムに再生
 canvas.addEventListener("click", () => {
-  const pool = names.filter((n) => !isIdleName(n) && n !== player?.currentAnimation);
+  const pool = names.filter((n) => !isIdleAnimation(character, n) && n !== player?.currentAnimation);
   const name = pool[Math.floor(Math.random() * pool.length)];
   if (name) play(name);
 });
@@ -201,7 +239,24 @@ soundButton.addEventListener("click", () => {
   }
 });
 
-window.addEventListener("resize", fitCanvas);
+sizeInput.addEventListener("input", () => {
+  applySize();
+  try {
+    localStorage.setItem(SIZE_KEY, sizeInput.value);
+  } catch { /* ignore */ }
+});
+
+balloonClose.addEventListener("click", () => {
+  balloon.hidden = true;
+});
+
+// 操作があったら放置時間を数え直し、待機動作中なら自然に終わらせる
+for (const type of ["pointerdown", "keydown"]) {
+  document.addEventListener(type, () => {
+    idle.userActivity();
+    void idle.interrupt();
+  });
+}
 
 // 作業ウィンドウ (同じオリジン) で選んだキャラクターがあれば、そのまま使う
 void loadCharacter()
