@@ -16,6 +16,20 @@ const INTERRUPT_WAIT_MS = 1_500;
 
 export const isIdleName = (name: string | undefined): boolean => name !== undefined && IDLE_NAME.test(name);
 
+/** 状態の一覧 (IdlingLevel1〜3) に割り当てられた待機動作。無いキャラクターは空 */
+function idleStates(character: AcsCharacter): string[][] {
+  return [1, 2, 3].map((level) => character.stateAnimations(`IdlingLevel${level}`));
+}
+
+/**
+ * 待機動作かどうか。状態の一覧に割り当てられているもの (Blink や Sleep など、名前が Idle で始まらないものも含む) と、
+ * 名前が Idle / DeepIdle で始まるもの
+ */
+export function isIdleAnimation(character: AcsCharacter | undefined, name: string | undefined): boolean {
+  if (name === undefined) return false;
+  return isIdleName(name) || (!!character && idleStates(character).some((names) => names.includes(name)));
+}
+
 /** 待機動作の「深さ」。Idle1_x < Idle2_x < Idle3_x、居眠りや DeepIdle は最深 */
 export function idleLevel(name: string): number {
   const m = /^Idle(\d)_/i.exec(name);
@@ -36,6 +50,30 @@ export function pickIdle(names: Iterable<string>, maxLevel: number, last?: strin
     if (roll < 0) return src[i];
   }
   return src[src.length - 1];
+}
+
+/**
+ * 放置の段階 (1〜3) に合う待機動作を選ぶ。キャラクターに状態の一覧 (IdlingLevel1〜3) があれば、作者の割り当てに従い
+ * (その段階が無ければ、より浅い段階から)、無ければ名前から推測する (pickIdle)。選んだ動作と、その段階を返す
+ */
+export function pickIdleFor(
+  character: AcsCharacter,
+  maxLevel: number,
+  last?: string,
+  random = Math.random,
+): { name: string; level: number } | undefined {
+  const byLevel = idleStates(character);
+  if (byLevel.some((names) => names.length > 0)) {
+    for (let level = maxLevel; level >= 1; level--) {
+      const pool = byLevel[level - 1] ?? [];
+      if (pool.length === 0) continue;
+      const fresh = pool.filter((n) => n !== last);
+      const src = fresh.length > 0 ? fresh : pool;
+      return { name: src[Math.floor(random() * src.length)]!, level };
+    }
+  }
+  const name = pickIdle(character.animations.keys(), maxLevel, last, random);
+  return name === undefined ? undefined : { name, level: idleLevel(name) };
 }
 
 export interface IdleDeps {
@@ -75,12 +113,21 @@ export class IdleController {
     this.reschedule();
   }
 
+  /**
+   * 待機動作をいま実際に再生中か。別のアニメーションの play() や stop() で止められると、
+   * 待機動作の play() の Promise は解決しないので、idlePlaying だけでなくプレイヤーの状態も確かめる
+   */
+  private get idleActive(): boolean {
+    return this.idlePlaying && this.deps.player()?.currentAnimation === this.lastName;
+  }
+
   /** 再生中の待機動作を終了分岐で終わらせる (長引くときは打ち切る)。待機動作中でなければ即 resolve */
   async interrupt(): Promise<void> {
     const player = this.deps.player();
-    if (!this.idlePlaying || !player) return;
+    if (!this.idleActive || !player) return;
     await Promise.race([player.release(), new Promise((r) => window.setTimeout(r, INTERRUPT_WAIT_MS))]);
-    if (this.idlePlaying) player.stop();
+    // 待っている間に別のアニメーションが始まっていたら、それは止めない
+    if (this.idleActive) player.stop();
   }
 
   private reschedule() {
@@ -92,18 +139,24 @@ export class IdleController {
     const character = this.deps.character();
     const now = Date.now();
     if (!player || !character || document.hidden) return;
+    // 待機動作が別の再生で止められていたら、終わったものとして次を予約し直す
+    if (this.idlePlaying && !this.idleActive) {
+      this.idlePlaying = false;
+      this.reschedule();
+    }
     if (this.idlePlaying || player.isPlaying || this.deps.busy() || now < this.nextAt) return;
 
     const level = Math.min(MAX_LEVEL, 1 + Math.floor((now - this.lastActivity) / ESCALATE_MS));
-    const name = pickIdle(character.animations.keys(), level, this.lastName);
-    if (!name) {
+    const picked = pickIdleFor(character, level, this.lastName);
+    if (!picked) {
       this.reschedule();
       return;
     }
+    const { name } = picked;
     this.lastName = name;
     this.idlePlaying = true;
     const id = ++this.playId;
-    if (idleLevel(name) < MAX_LEVEL) {
+    if (picked.level < MAX_LEVEL) {
       window.setTimeout(() => {
         if (this.idlePlaying && this.playId === id) void this.interrupt();
       }, MAX_SHALLOW_IDLE_MS);

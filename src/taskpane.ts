@@ -1,9 +1,10 @@
 import { AcsPlayer } from "./acs/player";
+import { imageToDataUrl } from "./acs/icon";
 import { AcsCharacter } from "./acs/reader";
 import DOMPurify from "dompurify";
 import { watchWorksheetActivated } from "./excel";
 import { askGroq, GroqChatMessage, testGroqKey } from "./groq";
-import { IdleController, isIdleName } from "./idle";
+import { IdleController, isIdleAnimation } from "./idle";
 import { marked } from "marked";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
@@ -34,6 +35,8 @@ function setStatus(title: string, desc = "") {
 }
 const playButton = $<HTMLButtonElement>("play");
 const pickButton = $<HTMLButtonElement>("pick");
+const pickIcon = $<HTMLImageElement>("pick-icon");
+const pickEmoji = pickButton.querySelector<HTMLElement>(".emoji")!;
 const queryInput = $<HTMLTextAreaElement>("query");
 const engineSelect = $<HTMLSelectElement>("engine");
 const fileInput = $<HTMLInputElement>("file");
@@ -70,7 +73,7 @@ const SKIP = /^(Idle|RestPose|Show|Hide|GoodBye|Greet)/i;
 let lastAnimation: string | undefined;
 
 /** 自分で再生したアニメーションの再生中か (放置中に勝手に始まる待機動作は含めない) */
-const userAnimationPlaying = () => !!player?.isPlaying && !isIdleName(player.currentAnimation);
+const userAnimationPlaying = () => !!player?.isPlaying && !isIdleAnimation(character, player.currentAnimation);
 
 /** 再生中は ■ (クリックで停止)、待機中は ▶。待機動作 (Idle) の再生中は ▶ のまま */
 function renderPlayButton(playing: boolean) {
@@ -107,9 +110,9 @@ function useCharacter(data: ArrayBuffer, name: string) {
   renderPlayButton(false);
   // 読み込んだ時点から放置時間を数え直す (直後から深い待機動作が出ないように)
   idle.userActivity();
-  // 登場: 最初は何も描かず (見えない状態)、Greeting (無ければ Show) で現れる。
+  // 登場: 最初は何も描かず (見えない状態)、Greeting (無ければ Showing 状態の割り当て → Show) で現れる。
   // どちらも無いキャラクターは、待機ポーズをそのまま表示する
-  const appear = firstAnimation("Greeting", "Show");
+  const appear = firstAnimation("Greeting", ...character.stateAnimations("Showing"), "Show");
   if (appear) {
     void player.play(appear);
   } else {
@@ -120,6 +123,11 @@ function useCharacter(data: ArrayBuffer, name: string) {
   const displayName = character.name || name.replace(/\.[^.]+$/, "");
   canvas.title = `${displayName}\nクリックでアニメーション`;
   currentCharacterDisplayName = displayName;
+  // キャラクターを選ぶボタンは、タスクトレイ用アイコンがあれば 🐬 の代わりにそれを出す (無ければ 🐬 のまま)
+  const icon = character.trayIcon && imageToDataUrl(character.trayIcon);
+  if (icon) pickIcon.src = icon;
+  pickIcon.hidden = !icon;
+  pickEmoji.hidden = !!icon;
   applyCharacterPersonaIfUnset(displayName, character.description);
   setStatus("");
   updateCharacterRequiredUi();

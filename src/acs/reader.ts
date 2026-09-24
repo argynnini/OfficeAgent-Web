@@ -1,4 +1,5 @@
 import { decompress } from "./decompress";
+import { decodeTrayIcon } from "./icon";
 
 export interface Location {
   offset: number;
@@ -91,6 +92,16 @@ export class AcsCharacter {
   readonly description: string | undefined;
   /** [r, g, b] の配列 */
   readonly palette: [number, number, number][] = [];
+  /**
+   * タスクトレイ用の小さなアイコン (Microsoft Agent のキャラクターは 16x16 が多い)。
+   * Office アシスタント (クリッパー・イルカなど) には入っていないことが多い。無ければ undefined
+   */
+  readonly trayIcon: AcsImage | undefined;
+  /**
+   * 状態 (Showing / Hiding / IdlingLevel1〜3 / GesturingLeft など) ごとに、キャラクター作者が割り当てたアニメーション名。
+   * キーは大文字の状態名、値は animations のキーの表記 (ファイルでは大文字で入っているので、実在する名前に直してある)
+   */
+  readonly states = new Map<string, string[]>();
   readonly animations = new Map<string, Animation>();
 
   private readonly imageLocations: Location[] = [];
@@ -139,6 +150,28 @@ export class AcsCharacter {
       this.palette.push([r, g, b]);
     }
 
+    // タスクトレイ用のアイコンと状態の一覧。読めなくてもキャラクター自体は使えるようにする
+    const rawStates: [string, string[]][] = [];
+    try {
+      // タスクトレイ用のアイコン: 白黒のマスク DIB、色の DIB の順 (どちらも DWORD のサイズ付き)
+      if (c.u8() !== 0) {
+        const mask = c.bytes(c.u32());
+        const color = c.bytes(c.u32());
+        this.trayIcon = decodeTrayIcon(color, mask);
+      }
+      // 状態: WORD 個数、それぞれ 状態名 + WORD 個数 + アニメーション名
+      const stateCount = c.u16();
+      for (let i = 0; i < stateCount; i++) {
+        const state = c.string();
+        const names: string[] = [];
+        const count = c.u16();
+        for (let j = 0; j < count; j++) names.push(c.string());
+        rawStates.push([state, names]);
+      }
+    } catch {
+      rawStates.length = 0;
+    }
+
     // --- 画像一覧 ---
     c.pos = imageLoc.offset;
     const imageCount = c.u32();
@@ -167,6 +200,18 @@ export class AcsCharacter {
     for (const e of entries) {
       this.animations.set(e.name, this.readAnimation(e.loc));
     }
+
+    // 状態のアニメーション名は大文字で入っているので、実在するアニメーション名の表記に直す (無いものは除く)
+    const byUpper = new Map([...this.animations.keys()].map((n) => [n.toUpperCase(), n]));
+    for (const [state, names] of rawStates) {
+      const resolved = names.map((n) => byUpper.get(n.toUpperCase())).filter((n): n is string => n !== undefined);
+      if (resolved.length > 0) this.states.set(state.toUpperCase(), resolved);
+    }
+  }
+
+  /** 状態 (例: "IdlingLevel1"、大文字小文字は問わない) に割り当てられたアニメーション名。無ければ空 */
+  stateAnimations(state: string): string[] {
+    return this.states.get(state.toUpperCase()) ?? [];
   }
 
   /**
