@@ -6,6 +6,7 @@ import { IdleController, isIdleName } from "./idle";
 import { marked } from "marked";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { loadCharacter, saveCharacter } from "./store";
+import { watchWordEvents } from "./word";
 
 marked.setOptions({ breaks: true, gfm: true });
 // リンクは、他のタブで安全に開く (target/rel はサニタイズ後に付け直さないと DOMPurify に消される)
@@ -262,6 +263,33 @@ for (const type of ["pointerdown", "keydown"]) {
     player?.unlockAudio();
   });
 }
+
+// --- ドキュメント側のイベントへの反応 (Word のコメント追加・削除、段落追加など) ---
+/** 待機動作を自然に終わらせてから、候補の先頭に見つかったアニメーションを 1 つ再生する (入力中・検索中・他の再生中は何もしない) */
+function reactTo(...candidates: string[]) {
+  if (!player || !character || focused || thinking || userAnimationPlaying()) return;
+  const name = firstAnimation(...candidates);
+  if (!name) return;
+  void idle.interrupt().then(() => {
+    if (focused || thinking || userAnimationPlaying()) return;
+    void player?.play(name);
+  });
+}
+
+/** fn の呼び出し間隔を空ける (頻発するイベントに反応させても、うるさくならないように) */
+function throttled(minMs: number, fn: () => void): () => void {
+  let last = 0;
+  return () => {
+    const now = Date.now();
+    if (now - last < minMs) return;
+    last = now;
+    fn();
+  };
+}
+
+const REACT_THROTTLE_MS = 15_000;
+/** 段落追加 (Enter で新しい段落) は書いている間ずっと発火するので間引く */
+const onParagraphAdded = throttled(REACT_THROTTLE_MS, () => reactTo("Acknowledge", "GestureDown", "LookDown", "GetAttention"));
 
 /** 読み込みが終わらないまま Thinking が続き続けないようにする上限 */
 const THINKING_MAX_MS = 20_000;
@@ -753,6 +781,15 @@ void Office.onReady(async (info) => {
       }
     });
     showSelection();
+  }
+  if (info.host === Office.HostType.Word) {
+    watchWordEvents({
+      onAnnotationInserted: () => reactTo("Congratulate", "Pleased", "Announce", "GetAttention"),
+      onAnnotationRemoved: () => reactTo("Confused", "Decline", "Sad"),
+      onParagraphAdded,
+    }).catch((e: unknown) => {
+      setStatus(`コメント・段落イベントを登録できません: ${(e as Error).message}`);
+    });
   }
 
   const saved = await loadCharacter().catch(() => undefined);
