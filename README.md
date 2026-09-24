@@ -140,7 +140,7 @@ master に push すると、GitHub Actions（`.github/workflows/deploy.yml`）�
 
 **対応済み**: ACS のパース（キャラクター情報・アニメーション・画像・効果音・タスクトレイ用アイコン・状態）、独自圧縮と ADPCM の展開、canvas での再生（分岐・終了分岐あり）、作業ウィンドウへの表示、ウェブ検索、Groq への質問と選択範囲の要約・翻訳・解説・校正、Word / Excel の操作に連動するアニメーション。
 
-**未対応**: 口パク（overlay）。状態（States）は、登場（Showing）と待機動作（IdlingLevel1〜3）だけで使っています（Speaking・Moving・Listening などは、対応する機能がまだないので未使用）。
+**未対応**: 作業ウィンドウでの読み上げと口パク（公開ページのデモでは、入力した言葉をブラウザの音声合成でしゃべらせ、口の画像（overlay）で口パクできます）。状態（States）は、登場（Showing）・待機動作（IdlingLevel1〜3）・デモの読み上げ中の動き（Speaking）で使っています（Moving・Listening などは、対応する機能がまだないので未使用）。
 
 1. ~~ACS パーサ + canvas 再生のプロトタイプ~~
 2. ~~タスクペインに表示 / 吹き出しで AI に質問~~

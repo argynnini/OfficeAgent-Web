@@ -90,6 +90,11 @@ export class AcsCharacter {
   readonly name: string | undefined;
   /** キャラクターの紹介文 (ACS に埋め込まれていれば。同じ優先順位で選ぶ) */
   readonly description: string | undefined;
+  /**
+   * 読み上げの声の設定 (Microsoft Agent の音声合成 = SAPI 4 の値)。音声の設定が無い (Office アシスタントなど)、
+   * またはエンジン任せ (-1) の項目は undefined
+   */
+  readonly voice: { /** 1 分あたりの単語数 */ speed?: number; /** 声の高さ (Hz) */ pitch?: number } = {};
   /** [r, g, b] の配列 */
   readonly palette: [number, number, number][] = [];
   /**
@@ -128,7 +133,11 @@ export class AcsCharacter {
     c.skip(4);
     if (style & STYLE_VOICE) {
       c.skip(32); // engine / mode GUID
-      c.skip(4 + 2); // speed / pitch
+      // 速さ・高さ。すべてのビットが 1 (-1) ならエンジン任せ
+      const speed = c.u32();
+      const pitch = c.u16();
+      if (speed !== 0xffffffff && speed > 0) this.voice.speed = speed;
+      if (pitch !== 0xffff && pitch > 0) this.voice.pitch = pitch;
       if (c.u8() !== 0) {
         c.skip(2); // lang id
         c.string(); // dialect

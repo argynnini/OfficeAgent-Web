@@ -31,3 +31,8 @@ export async function saveCharacter(name: string, data: ArrayBuffer): Promise<vo
 export async function loadCharacter(): Promise<{ name: string; data: ArrayBuffer } | undefined> {
   return run("readonly", (s) => s.get(KEY));
 }
+
+/** 保存したキャラクターを消す (次回から自動で読み込まない) */
+export async function deleteCharacter(): Promise<void> {
+  await run("readwrite", (s) => s.delete(KEY));
+}

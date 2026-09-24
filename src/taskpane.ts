@@ -7,7 +7,7 @@ import { askGroq, GroqChatMessage, testGroqKey } from "./groq";
 import { IdleController, isIdleAnimation } from "./idle";
 import { marked } from "marked";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
-import { loadCharacter, saveCharacter } from "./store";
+import { deleteCharacter, loadCharacter, saveCharacter } from "./store";
 import { AI_TASKS, AiTask, DEFAULT_AI_TASK, findAiTask } from "./tasks";
 import { watchWordEvents } from "./word";
 
@@ -96,7 +96,46 @@ function playRandom() {
   if (name) void player.play(name);
 }
 
+/** 外している途中 (退場アニメーションの再生中) のプレイヤー。その間に別のキャラクターを選んだら止める */
+let leavingPlayer: AcsPlayer | undefined;
+
+/**
+ * キャラクターを外す (キャラクター選択ボタンの右クリック)。退場アニメーション (Hiding の割り当て → Hide) を再生してから消し、
+ * 保存も消して、次回は自動で読み込まない。画面はキャラクター未選択の状態に戻す
+ */
+function unloadCharacter() {
+  if (!character || !player) return;
+  const leaving = player;
+  const hide = firstAnimation(...character.stateAnimations("Hiding"), "Hide");
+  cancelThinking();
+  character = undefined;
+  player = undefined;
+  currentCharacterDisplayName = undefined;
+  lastAnimation = undefined;
+  flyout.replaceChildren();
+  canvas.title = "";
+  canvas.style.cursor = "default";
+  pickIcon.hidden = true;
+  pickEmoji.hidden = false;
+  renderPlayButton(false);
+  updateCharacterRequiredUi();
+  setStatus("キャラクターファイルを選択してください。", "🐬をクリックして、Microsoft Agent キャラクターファイル (.acs) を選択してください");
+  void deleteCharacter().catch(() => undefined);
+
+  leavingPlayer = leaving;
+  const clear = () => {
+    if (leavingPlayer !== leaving) return; // 退場中に別のキャラクターを選んだ
+    leavingPlayer = undefined;
+    leaving.stop();
+    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+  };
+  if (hide) void leaving.play(hide).then(clear);
+  else clear();
+}
+
 function useCharacter(data: ArrayBuffer, name: string) {
+  leavingPlayer?.stop();
+  leavingPlayer = undefined;
   player?.stop();
   character = new AcsCharacter(data);
   player = new AcsPlayer(character, canvas);
@@ -717,7 +756,13 @@ queryInput.addEventListener("keydown", (e) => {
 });
 
 // カイル君をクリックするとランダムにアニメーション
-canvas.addEventListener("click", playRandom);
+// キャラクターの絵の上でだけ、クリックできる見た目 (指のカーソル) にして反応する。透明な部分のクリックは無視
+canvas.addEventListener("pointermove", (e) => {
+  canvas.style.cursor = player?.hitTest(e.clientX, e.clientY) ? "pointer" : "default";
+});
+canvas.addEventListener("click", (e) => {
+  if (player?.hitTest(e.clientX, e.clientY)) playRandom();
+});
 // 再生ボタン: 再生中はクリックで停止して待機ポーズへ。待機中 (待機動作の再生中を含む) は直前のアニメーションをもう一度 (未選択ならランダム)
 playButton.addEventListener("click", () => {
   if (player && userAnimationPlaying()) {
@@ -731,6 +776,11 @@ playButton.addEventListener("click", () => {
   }
 });
 pickButton.addEventListener("click", () => fileInput.click());
+// 右クリックで、キャラクターを外す (ブラウザのメニューは出さない)
+pickButton.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  unloadCharacter();
+});
 fileInput.addEventListener("change", () => {
   const f = fileInput.files?.[0];
   if (f) void pickFile(f);

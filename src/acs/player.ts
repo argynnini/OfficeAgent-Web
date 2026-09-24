@@ -35,6 +35,10 @@ export class AcsPlayer {
   onPlayingChange: ((playing: boolean) => void) | undefined;
   /** 現在の play() 全体 (戻りアニメ含む) の完了 Promise */
   private running: Promise<void> | undefined;
+  /** 口の形 (0: 閉じる, 1〜4: 大きく開く, 5: 中くらい, 6: すぼめる)。undefined なら口の画像を重ねない */
+  private mouth: number | undefined;
+  /** 最後に描いたフレーム (口の形を変えたときに描き直す) */
+  private lastFrame: Frame | undefined;
 
   constructor(
     private readonly character: AcsCharacter,
@@ -42,7 +46,8 @@ export class AcsPlayer {
   ) {
     canvas.width = character.width;
     canvas.height = character.height;
-    const ctx = canvas.getContext("2d", { colorSpace: COLOR_SPACE });
+    // 当たり判定 (hitTest) で画素を読み出すので、読み出し向けにしておく (キャラクターは小さいので描画の速さは気にならない)
+    const ctx = canvas.getContext("2d", { colorSpace: COLOR_SPACE, willReadFrequently: true });
     if (!ctx) throw new Error("canvas 2d を取得できません");
     this.ctx = ctx;
   }
@@ -182,14 +187,45 @@ export class AcsPlayer {
     return c;
   }
 
+  /**
+   * 画面上の位置 (マウスイベントの clientX / clientY) に、キャラクターの絵があるか。
+   * 透明な部分 (キャラクターの周り) なら false。CSS で拡大・縮小されていても、canvas の画素に直して調べる
+   */
+  hitTest(clientX: number, clientY: number): boolean {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    const x = Math.floor(((clientX - rect.left) / rect.width) * this.canvas.width);
+    const y = Math.floor(((clientY - rect.top) / rect.height) * this.canvas.height);
+    if (x < 0 || y < 0 || x >= this.canvas.width || y >= this.canvas.height) return false;
+    return this.ctx.getImageData(x, y, 1, 1).data[3]! > 0;
+  }
+
+  /**
+   * 話している間の口の形を変える (undefined で口の画像を重ねるのをやめる)。
+   * 口の画像はフレームごとに入っているので、口の画像が無いフレーム (動きの途中など) では何も変わらない
+   */
+  setMouth(type: number | undefined) {
+    if (this.mouth === type) return;
+    this.mouth = type;
+    if (this.lastFrame) this.draw(this.lastFrame);
+  }
+
   draw(frame: Frame) {
+    this.lastFrame = frame;
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const mouth = this.mouth === undefined ? undefined : frame.overlays.find((o) => o.type === this.mouth);
     // 先頭の画像が最前面
     for (let i = frame.images.length - 1; i >= 0; i--) {
+      // replace の口の画像は、最前面の画像の代わりに描く (そうでなければ全部の上に重ねる)
+      if (i === 0 && mouth?.replace) continue;
       const fi = frame.images[i]!;
       const s = this.sprite(fi.imageIndex);
       if (s.width === 0 || s.height === 0) continue; // 未使用のプレースホルダー画像は描かない
       this.ctx.drawImage(s, fi.x, fi.y);
+    }
+    if (mouth) {
+      const s = this.sprite(mouth.imageIndex);
+      if (s.width > 0 && s.height > 0) this.ctx.drawImage(s, mouth.x, mouth.y);
     }
   }
 }

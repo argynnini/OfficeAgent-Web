@@ -111,6 +111,13 @@
       .icon-btn[data-playing="true"] .play, .icon-btn[data-playing="false"] .stop { display: none; }
       .icon-btn[aria-pressed="false"] { opacity: 0.55; }
 
+      /* しゃべらせる: 入力欄 + 話すボタン */
+      .speak { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+      .speak[hidden] { display: none; }
+      #speak-text { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: inherit; font: inherit; font-size: 13px; }
+      #speak-text:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+      .speak .btn { padding: 6px 14px; font-size: 13px; white-space: nowrap; }
+
       /* アニメーション一覧: 絞り込み + ボタンの並び */
       .anims { border-top: 1px solid var(--border); padding: 10px 12px 12px; }
       .anims[hidden] { display: none; }
@@ -190,7 +197,7 @@
           </div>
           <div class="toolbar">
             <input id="file" type="file" accept=".acs" hidden />
-            <button id="pick" class="icon-btn" type="button" title="キャラクターを選ぶ" aria-label="キャラクターを選ぶ">
+            <button id="pick" class="icon-btn" type="button" title="キャラクターを選ぶ&#10;右クリックで、キャラクターを外します。" aria-label="キャラクターを選ぶ">
               <span id="pick-emoji" aria-hidden="true">🐬</span>
               <!-- 読み込んだキャラクターにタスクトレイ用アイコンがあれば、🐬 の代わりに出す -->
               <img id="pick-icon" class="char-icon" alt="" width="16" height="16" hidden />
@@ -208,6 +215,10 @@
               </svg>
             </button>
           </div>
+          <form id="speak" class="speak" hidden>
+            <input id="speak-text" type="text" maxlength="500" placeholder="しゃべらせたい言葉 (空欄のままなら自己紹介)" aria-label="しゃべらせたい言葉" autocomplete="off" />
+            <button id="speak-button" class="btn primary" type="submit" title="ブラウザの音声合成で読み上げ、口を動かします">🗣 話す</button>
+          </form>
           <div id="anims" class="anims" hidden>
             <input id="filter" type="search" placeholder="アニメーションを絞り込み (例: Greet, Wave)" aria-label="アニメーションを絞り込み" autocomplete="off" />
             <div id="anim-list" class="anim-list" role="list"></div>
