@@ -63,8 +63,8 @@ function updateCharacterRequiredUi() {
 }
 updateCharacterRequiredUi();
 
-/** 自動再生に向かない (待機・登場・退場) アニメーションを除く */
-const SKIP = /^(Idle|RestPose|Show|Hide|GoodBye|Greet)/i;
+/** 自動再生に向かない (待機・登場・退場) アニメーションを除く。Appear / Disappear は Office 97 のアシスタント (.act) の登場・退場 */
+const SKIP = /^(Idle|RestPose|Show|Hide|GoodBye|Greet|Appear|Disappear)/i;
 
 let lastAnimation: string | undefined;
 
@@ -358,7 +358,7 @@ let focused = false;
 let thinking = false;
 
 function playWriting() {
-  const name = firstAnimation("Writing", "Write");
+  const name = firstAnimation("Writing", "Write", "WritingNotingSomething");
   if (!focused || thinking || !name || !player) return;
   void player.play(name).then(playWriting);
 }
@@ -392,6 +392,8 @@ for (const type of ["pointerdown", "keydown"]) {
 }
 
 // --- ドキュメント側のイベントへの反応 (Word のコメント追加・削除、段落追加、Excel のシート切り替えなど) ---
+// 候補は、Microsoft Agent のキャラクター (.acs) の名前を先に、Office 97 のアシスタント (.act) の名前
+// (msagent.js が msoAnimationType から付ける CharacterSuccessMajor など) を後に並べる
 /** 待機動作を自然に終わらせてから、候補の先頭に見つかったアニメーションを 1 つ再生する (入力中・検索中・他の再生中は何もしない) */
 function reactTo(...candidates: string[]) {
   if (!player || !character || focused || thinking || userAnimationPlaying()) return;
@@ -909,8 +911,8 @@ void (async () => {
     });
     showSelection();
     host.watchDocument({
-      onCommentAdded: () => reactTo("Congratulate", "Pleased", "Announce", "GetAttention"),
-      onCommentRemoved: () => reactTo("Confused", "Decline", "Sad"),
+      onCommentAdded: () => reactTo("Congratulate", "Pleased", "Announce", "GetAttention", "CharacterSuccessMajor", "GetAttentionMajor"),
+      onCommentRemoved: () => reactTo("Confused", "Decline", "Sad", "EmptyTrash"),
       onParagraphAdded,
       onSheetActivated,
     }).catch((e: unknown) => {

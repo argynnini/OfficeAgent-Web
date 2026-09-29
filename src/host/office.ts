@@ -52,11 +52,7 @@ export async function connectOfficeHost(): Promise<Host | undefined> {
 
     async watchDocument(handlers: DocumentEventHandlers) {
       if (host === Office.HostType.Word) {
-        await watchWordEvents({
-          onAnnotationInserted: handlers.onCommentAdded,
-          onAnnotationRemoved: handlers.onCommentRemoved,
-          onParagraphAdded: handlers.onParagraphAdded,
-        });
+        await watchWordEvents(handlers);
       }
       if (host === Office.HostType.Excel && handlers.onSheetActivated) {
         await watchWorksheetActivated(handlers.onSheetActivated);
