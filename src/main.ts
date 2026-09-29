@@ -1,4 +1,4 @@
-import { AcsCharacter, AcsPlayer, ActCharacter, IdleController, imageToDataUrl, isActFile, isIdleAnimation, Speaker, voiceParams, type Character } from "@argynnini/msagent.js";
+import msagent, { imageToDataUrl, isActFile, type Agent, type AgentRequest } from "@argynnini/msagent.js";
 import { deleteCharacter, loadCharacter, saveCharacter } from "./store";
 
 const fileInput = document.getElementById("file") as HTMLInputElement;
@@ -6,7 +6,7 @@ const pickButton = document.getElementById("pick") as HTMLButtonElement;
 const emptyButton = document.getElementById("empty") as HTMLButtonElement;
 const playButton = document.getElementById("play") as HTMLButtonElement;
 const soundButton = document.getElementById("sound") as HTMLButtonElement;
-const canvas = document.getElementById("stage") as HTMLCanvasElement;
+const home = document.getElementById("home") as HTMLElement;
 const balloon = document.getElementById("balloon") as HTMLElement;
 const balloonText = document.getElementById("balloon-text") as HTMLElement;
 const balloonClose = document.getElementById("balloon-close") as HTMLButtonElement;
@@ -23,16 +23,21 @@ const speakForm = document.getElementById("speak") as HTMLFormElement;
 const speakInput = document.getElementById("speak-text") as HTMLInputElement;
 const speakButton = document.getElementById("speak-button") as HTMLButtonElement;
 
-/** キャラクターの表示倍率 (%) を覚えておく。ステージより大きくなる分は CSS (max-width: 100%) で縮める */
+/** キャラクターの表示倍率 (%) を覚えておく */
 const SIZE_KEY = "officeagent.demoSize";
 
-let player: AcsPlayer | undefined;
-let character: Character | undefined;
+let agent: Agent | undefined;
+/** 外している途中 (退場アニメーションの再生中) のキャラクター。その間に別のキャラクターを選んだら、すぐ片付ける */
+let leaving: Agent | undefined;
 let names: string[] = [];
 /** 最後に選んだアニメーション (再生ボタンで繰り返す) */
 let selected: string | undefined;
+/** 「話す」でしゃべらせている命令 (読み込み直後の案内など、ほかのしゃべりは含めない) */
+let userSpeech: AgentRequest | undefined;
+/** 描いているアニメーション。待機動作 (Idle) かどうかも覚える */
+let current: { name: string; idle: boolean } | undefined;
 
-/** 吹き出しにメッセージを出す (× で閉じていても、新しいメッセージでまた出す) */
+/** ステージの吹き出しにメッセージを出す (× で閉じていても、新しいメッセージでまた出す) */
 function say(html: string, error = false) {
   balloonText.innerHTML = html;
   balloon.dataset.error = String(error);
@@ -45,11 +50,11 @@ const DEFAULT_FAVICON = faviconLink?.href ?? "";
 
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** スライダーの倍率で表示する (ドット絵なので image-rendering: pixelated で拡大) */
+/** スライダーの倍率で表示する (拡大はドット絵のまま。足もとの位置は変わらない) */
 function applySize() {
   const percent = Number(sizeInput.value);
   sizeValue.value = `${percent}%`;
-  if (character) canvas.style.width = `${Math.round((character.width * percent) / 100)}px`;
+  if (agent) agent.scale = percent / 100;
 }
 
 try {
@@ -58,18 +63,7 @@ try {
 } catch { /* 保存できない環境では既定のまま */ }
 
 /** 待機動作 (Idle) の再生中は、再生ボタンを「停止」にせず、一覧でも強調しない (作業ウィンドウと同じ) */
-const userAnimationPlaying = () => !!player?.isPlaying && !isIdleAnimation(character, player.currentAnimation);
-
-// しゃべる: 音声合成で読み上げ、その間は口の形を切り替える
-const speaker = new Speaker(() => player);
-
-// 放置すると、ときどき待機動作を再生する (放置が長いほど深い動き。作業ウィンドウと同じ)。しゃべっている間は出さない
-const idle = new IdleController({
-  player: () => player,
-  character: () => character,
-  busy: () => speaker.speaking,
-});
-idle.start();
+const userAnimationPlaying = () => !!current && !current.idle;
 
 function renderList() {
   const q = filter.value.trim().toLowerCase();
@@ -89,137 +83,158 @@ function renderList() {
       b.role = "listitem";
       b.textContent = n;
       b.dataset.name = n;
-      b.setAttribute("aria-current", String(userAnimationPlaying() && n === player?.currentAnimation));
+      b.setAttribute("aria-current", String(userAnimationPlaying() && n === current?.name));
       return b;
     }),
   );
 }
 
+/** 再生ボタンと一覧の強調を、いま描いているアニメーションに合わせる */
 function markCurrent() {
-  const current = userAnimationPlaying() ? player?.currentAnimation : undefined;
+  const user = userAnimationPlaying();
+  playButton.dataset.playing = String(user);
+  playButton.title = playButton.ariaLabel = user ? "停止" : "再生";
   animList.querySelectorAll<HTMLButtonElement>(".anim").forEach((b) => {
-    b.setAttribute("aria-current", String(b.dataset.name === current));
+    b.setAttribute("aria-current", String(user && b.dataset.name === current?.name));
   });
 }
 
+/** アニメーションを再生する。順番待ちや再生中の動きは捨てて、すぐ切り替える */
 function play(name: string) {
-  if (!player) return;
+  if (!agent) return;
   selected = name;
-  player.unlockAudio();
-  void player.play(name);
+  agent.stop();
+  agent.play(name);
 }
 
-/** 外している途中 (退場アニメーションの再生中) のプレイヤー。その間に別のキャラクターを選んだら止める */
-let leavingPlayer: AcsPlayer | undefined;
+/** 読み込んだ画面の表示 (キャラクター名・一覧など) を、キャラクター未選択の状態に戻す */
+function resetView() {
+  names = [];
+  selected = undefined;
+  current = undefined;
+  userSpeech = undefined;
+  animList.replaceChildren();
+  animsPanel.hidden = speakForm.hidden = sizeRow.hidden = true;
+  playButton.disabled = true;
+  markCurrent();
+  speakButton.textContent = "🗣 話す";
+  nameLabel.textContent = "キャラクター未選択";
+  nameLabel.title = "";
+  pickIcon.hidden = true;
+  pickEmoji.hidden = false;
+  if (faviconLink) faviconLink.href = DEFAULT_FAVICON;
+}
 
 /** 最初に吹き出しに出している案内 (キャラクターを外したら、これに戻す) */
 const INITIAL_BALLOON = balloonText.innerHTML;
 
 /**
  * キャラクターを外す (キャラクター選択ボタンの右クリック)。退場アニメーション (Hiding の割り当て → Hide) を再生してから消し、
- * 保存も消して、次回は自動で読み込まない。画面はキャラクター未選択の状態に戻す
+ * 保存も消して、次回は自動で読み込まない
  */
 function unload() {
-  if (!character || !player) return;
-  const leaving = player;
-  const hide = [...character.stateAnimations("Hiding"), "Hide"].find((n) => character!.animations.has(n));
-  speaker.cancel();
-  character = undefined;
-  player = undefined;
-  names = [];
-  selected = undefined;
-  animList.replaceChildren();
-  animsPanel.hidden = speakForm.hidden = sizeRow.hidden = true;
-  playButton.disabled = true;
-  playButton.dataset.playing = "false";
-  nameLabel.textContent = "キャラクター未選択";
-  nameLabel.title = "";
-  pickIcon.hidden = true;
-  pickEmoji.hidden = false;
-  if (faviconLink) faviconLink.href = DEFAULT_FAVICON;
+  if (!agent) return;
+  const old = (leaving = agent);
+  agent = undefined;
+  resetView();
   say(INITIAL_BALLOON);
   void deleteCharacter().catch(() => undefined);
-
-  leavingPlayer = leaving;
-  const clear = () => {
-    if (leavingPlayer !== leaving) return; // 退場中に別のキャラクターを選んだ
-    leavingPlayer = undefined;
-    leaving.stop();
-    canvas.hidden = true;
+  old.stop();
+  void old.hide().then(() => {
+    old.destroy();
+    if (leaving !== old) return; // 退場中に別のキャラクターを選んだ
+    leaving = undefined;
+    home.hidden = true;
     emptyButton.hidden = false;
-  };
-  if (hide) void leaving.play(hide).then(clear);
-  else clear();
+  });
+}
+
+/** ステージの真ん中 (目印の要素の下端の中央) に、キャラクターの足もとを置く */
+function placeAtHome(next: Agent) {
+  const r = home.getBoundingClientRect();
+  next.left = r.left + (r.width - next.width) / 2;
+  next.top = r.bottom - next.height;
 }
 
 async function open(fileName: string, data: ArrayBuffer, save: boolean) {
   say(`<b>${escape(fileName)}</b> を読み込み中…`);
+  let next: Agent;
   try {
-    // Office 97 のアシスタント (.act) か、Microsoft Agent のキャラクター (.acs) か
-    const act = isActFile(data);
-    const next: Character = act ? new ActCharacter(data) : new AcsCharacter(data);
-    speaker.cancel();
-    leavingPlayer?.stop();
-    leavingPlayer = undefined;
-    player?.stop();
-    character = next;
-    player = new AcsPlayer(next, canvas);
-    player.soundEnabled = soundButton.getAttribute("aria-pressed") === "true";
-    player.onPlayingChange = (playing) => {
-      const user = playing && userAnimationPlaying();
-      playButton.dataset.playing = String(user);
-      playButton.title = playButton.ariaLabel = user ? "停止" : "再生";
-      markCurrent();
-      if (!playing) idle.animationEnded();
-    };
-    // 読み込んだ時点から放置時間を数え直す (直後から深い待機動作が出ないように)
-    idle.userActivity();
-
-    names = [...next.animations.keys()].sort((a, b) => a.localeCompare(b));
-    filter.value = "";
-    renderList();
-
-    canvas.hidden = false;
-    emptyButton.hidden = true;
-    animsPanel.hidden = false;
-    speakForm.hidden = false;
-    sizeRow.hidden = false;
-    playButton.disabled = false;
-    applySize();
-
-    const title = next.name ?? fileName.replace(/\.ac[st]$/i, "");
-    // キャラクターのタスクトレイ用アイコンがあれば、選ぶボタンの 🐬 の代わりと、ブラウザのタブに出す (作業ウィンドウと同じ)
-    const icon = next.trayIcon && imageToDataUrl(next.trayIcon);
-    if (icon) pickIcon.src = icon;
-    pickIcon.hidden = !icon;
-    pickEmoji.hidden = !!icon;
-    // 形式 (ACS = Microsoft Agent / ACT = Office 97 のアシスタント) も並べて出す
-    const format = act
-      ? `<span class="format" title="Office 97 のアシスタント (.act)">ACT</span>`
-      : `<span class="format" title="Microsoft Agent のキャラクター (.acs)">ACS</span>`;
-    nameLabel.innerHTML = `<strong>${escape(title)}</strong> ${format} · ${next.width}×${next.height} · ${names.length} アニメーション`;
-    if (faviconLink) faviconLink.href = icon || DEFAULT_FAVICON;
-    nameLabel.title = fileName;
-    say(
-      next.description
-        ? escape(next.description)
-        : `<b>${escape(title)}</b> です。下の一覧からアニメーションを選んでください。`,
-    );
-
-    if (save) await saveCharacter(fileName, data).catch(() => undefined);
-
-    // 登場アニメ (Greeting → Showing 状態の割り当て → Show) があれば再生し、なければ待機姿勢を描く
-    const entrance = ["Greeting", ...next.stateAnimations("Showing"), "Show"].find((n) => next.animations.has(n));
-    if (entrance) {
-      selected = entrance;
-      void player.play(entrance);
-    } else {
-      const rest = next.animations.get("RestPose") ?? next.animations.values().next().value;
-      if (rest?.frames[0]) player.draw(rest.frames[0]);
-    }
+    next = await msagent.load({
+      name: data,
+      scale: Number(sizeInput.value) / 100,
+      sound: soundButton.getAttribute("aria-pressed") === "true",
+    });
   } catch (e) {
     say(`読み込みに失敗しました。<br />${escape((e as Error).message)}`, true);
+    return;
   }
+  // 前のキャラクター (退場中のものも) は、すぐ片付ける
+  agent?.destroy();
+  leaving?.destroy();
+  leaving = undefined;
+  agent = next;
+  current = undefined;
+  userSpeech = undefined;
+  speakButton.textContent = "🗣 話す";
+
+  next.on("animationstart", (e) => {
+    current = e.detail;
+    markCurrent();
+  });
+  next.on("animationend", (e) => {
+    if (current?.name === e.detail.name) current = undefined;
+    markCurrent();
+  });
+  // キャラクターをクリック: 待機以外のアニメーションをランダムに再生 (透明な部分のクリックは、下のページに届く)
+  next.on("click", (e) => {
+    if (e.detail.button !== "left") return;
+    next.stop();
+    next.animate();
+  });
+  // 右クリックのメニュー (「隠す」など) で隠れたら、キャラクターを外す
+  next.on("hide", (e) => {
+    if (e.detail.cause === "user" && agent === next) unload();
+  });
+
+  names = next.animations().sort((a, b) => a.localeCompare(b));
+  filter.value = "";
+  renderList();
+
+  emptyButton.hidden = true;
+  home.hidden = false;
+  animsPanel.hidden = false;
+  speakForm.hidden = false;
+  sizeRow.hidden = false;
+  playButton.disabled = false;
+  const { character } = next;
+  placeAtHome(next);
+
+  const title = next.name ?? fileName.replace(/\.ac[st]$/i, "");
+  // キャラクターのタスクトレイ用アイコンがあれば、選ぶボタンの 🐬 の代わりと、ブラウザのタブに出す (作業ウィンドウと同じ)
+  const icon = character.trayIcon && imageToDataUrl(character.trayIcon);
+  if (icon) pickIcon.src = icon;
+  pickIcon.hidden = !icon;
+  pickEmoji.hidden = !!icon;
+  // 形式 (ACS = Microsoft Agent / ACT = Office 97 のアシスタント) も並べて出す
+  const format = isActFile(data)
+    ? `<span class="format" title="Office 97 のアシスタント (.act)">ACT</span>`
+    : `<span class="format" title="Microsoft Agent のキャラクター (.acs)">ACS</span>`;
+  nameLabel.innerHTML = `<strong>${escape(title)}</strong> ${format} · ${character.width}×${character.height} · ${names.length} アニメーション`;
+  if (faviconLink) faviconLink.href = icon || DEFAULT_FAVICON;
+  nameLabel.title = fileName;
+  // ステージの吹き出しは閉じ、ここからはキャラクター自身の吹き出しでしゃべる
+  balloon.hidden = true;
+
+  if (save) await saveCharacter(fileName, data).catch(() => undefined);
+
+  // 登場アニメ (Showing 状態の割り当て → Show) の後、あいさつ (Greeting) があれば続ける
+  next.show();
+  if (next.hasAnimation("Greeting")) {
+    selected = "Greeting";
+    next.play("Greeting");
+  }
+  next.speak("ドラッグで好きな場所へ動かせます。右クリックでメニュー、クリックでランダムに動きます。", { voice: false });
 }
 
 async function openFile(file: File) {
@@ -278,81 +293,44 @@ filter.addEventListener("keydown", (e) => {
 });
 
 playButton.addEventListener("click", () => {
-  if (!player) return;
-  speaker.cancel();
-  if (userAnimationPlaying()) return void player.release();
+  if (!agent) return;
+  if (userAnimationPlaying() || agent.speaking) return agent.stop();
   if (selected) play(selected);
-});
-
-// キャラクターの絵の上でだけ、クリックできる見た目 (指のカーソル) にする。透明な部分は反応しない
-canvas.addEventListener("pointermove", (e) => {
-  canvas.style.cursor = player?.hitTest(e.clientX, e.clientY) ? "pointer" : "";
-});
-// キャラクターをクリック: 待機以外のアニメーションをランダムに再生 (透明な部分のクリックは無視)
-canvas.addEventListener("click", (e) => {
-  if (!player?.hitTest(e.clientX, e.clientY)) return;
-  const pool = names.filter((n) => !isIdleAnimation(character, n) && n !== player?.currentAnimation);
-  const name = pool[Math.floor(Math.random() * pool.length)];
-  if (name) play(name);
 });
 
 soundButton.addEventListener("click", () => {
   const on = soundButton.getAttribute("aria-pressed") !== "true";
   soundButton.setAttribute("aria-pressed", String(on));
   soundButton.title = on ? "効果音: オン" : "効果音: オフ";
-  if (player) {
-    player.soundEnabled = on;
-    if (on) player.unlockAudio();
-  }
+  if (agent) agent.sound = on;
 });
 
 // --- しゃべらせる ---
-/** 吹き出しに、しゃべっている言葉を出す (HTML ではなく文字として) */
-function sayText(text: string) {
-  balloonText.textContent = text || "…";
-  balloon.dataset.error = "false";
-  balloon.hidden = false;
-}
-
-function speak(text: string) {
-  if (!player || !character) return;
-  const current = character;
-  speakButton.textContent = "■ やめる";
-  // 待機動作は自然に終わらせ、話すときの動き (Speaking 状態の割り当て。Merlin などは RestPose) にする。
-  // ほかのアニメーションの再生中なら、それを続けたまま口だけ動かす (口の画像があるフレームでだけ口が動く)
-  void idle.interrupt().then(() => {
-    if (character !== current || !speaker.speaking) return;
-    const speaking = current.stateAnimations("Speaking")[0];
-    if (speaking && !userAnimationPlaying()) void player?.play(speaking);
-  });
-  // 声の速さ・高さは、キャラクターの設定 (ACS の音声の設定) に合わせる (例: Merlin は低くゆっくり)
-  speaker.speak(
-    text,
-    {
-      onProgress: sayText,
-      onEnd: () => {
-        speakButton.textContent = "🗣 話す";
-        idle.animationEnded();
-      },
-    },
-    voiceParams(current.voice),
-  );
-}
-
-/** 空欄のまま「話す」を押したときの自己紹介: ACS の紹介文 (無ければ名前だけ) */
+/** 空欄のまま「話す」を押したときの自己紹介: 紹介文 (無ければ名前だけ) */
 function selfIntroduction(): string {
-  if (!character) return "";
-  const description = character.description?.trim();
+  if (!agent) return "";
+  const description = agent.description?.trim();
   if (description) return description;
-  const name = character.name ?? nameLabel.title.replace(/\.ac[st]$/i, "");
+  const name = agent.name ?? nameLabel.title.replace(/\.ac[st]$/i, "");
   return `こんにちは、${name}です。`;
 }
 
 speakForm.addEventListener("submit", (e) => {
   e.preventDefault();
-  if (speaker.speaking) return speaker.cancel();
+  if (!agent) return;
+  if (userSpeech) return agent.stop(userSpeech);
   const text = speakInput.value.trim() || selfIntroduction();
-  if (text) speak(text);
+  if (!text) return;
+  // 声の速さ・高さは、キャラクターの設定 (ACS の音声の設定) に合わせる (例: Merlin は低くゆっくり)。
+  // 待機動作は自然に終わらせ、話すときの動き (Speaking 状態の割り当て) にする
+  agent.stop();
+  const request = (userSpeech = agent.speak(text));
+  speakButton.textContent = "■ やめる";
+  void request.then(() => {
+    if (userSpeech !== request) return;
+    userSpeech = undefined;
+    speakButton.textContent = "🗣 話す";
+  });
 });
 
 sizeInput.addEventListener("input", () => {
@@ -366,17 +344,9 @@ balloonClose.addEventListener("click", () => {
   balloon.hidden = true;
 });
 
-// 操作があったら放置時間を数え直し、待機動作中なら自然に終わらせる
-for (const type of ["pointerdown", "keydown"]) {
-  document.addEventListener(type, () => {
-    idle.userActivity();
-    void idle.interrupt();
-  });
-}
-
 // 作業ウィンドウ (同じオリジン) で選んだキャラクターがあれば、そのまま使う
 void loadCharacter()
   .then((saved) => {
-    if (saved && !character) return open(saved.name, saved.data, false);
+    if (saved && !agent) return open(saved.name, saved.data, false);
   })
   .catch(() => undefined);

@@ -73,8 +73,9 @@
       /* ステージ (プレイヤー) */
       .player { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
       .stage { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; min-height: 340px; padding: 20px 16px 22px; background: radial-gradient(circle at 50% 70%, var(--stage-a), var(--stage-b)); }
-      #stage { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
-      #stage[hidden] { display: none; }
+      /* キャラクター (msagent.js が画面の上に浮かべる) を最初に置く場所。ステージの余白を埋める */
+      .home { flex: 1; align-self: stretch; min-height: 128px; }
+      .home[hidden] { display: none; }
       /* 吹き出し (Office アシスタント風)。キャラクターの状態やヒントを出す */
       .balloon { position: relative; max-width: 300px; margin-bottom: 14px; padding: 10px 26px 10px 14px; background: var(--balloon); color: var(--balloon-fg); border: 1.5px solid var(--balloon-border); border-radius: 12px; font-size: 13px; line-height: 1.55; text-align: center; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); }
       .balloon::after { content: ""; position: absolute; left: 50%; bottom: -9px; width: 14px; height: 14px; margin-left: -7px; background: var(--balloon); border-right: 1.5px solid var(--balloon-border); border-bottom: 1.5px solid var(--balloon-border); transform: rotate(45deg); }
@@ -189,7 +190,7 @@
               <button id="balloon-close" class="balloon-close" type="button" title="吹き出しを閉じる" aria-label="吹き出しを閉じる">×</button>
             </div>
             <button id="empty" class="empty" type="button" aria-label="キャラクターを選ぶ">🐬</button>
-            <canvas id="stage" width="128" height="128" hidden title="クリックすると、ランダムに動きます"></canvas>
+            <div id="home" class="home" hidden></div>
             <label id="size-row" class="size" hidden>
               大きさ
               <input id="size" type="range" min="50" max="300" step="25" value="200" />
