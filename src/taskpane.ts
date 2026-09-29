@@ -1,12 +1,11 @@
 import { AcsCharacter, AcsPlayer, ActCharacter, IdleController, imageToDataUrl, isActFile, isIdleAnimation, type Character } from "@argynnini/msagent.js";
 import DOMPurify from "dompurify";
-import { watchWorksheetActivated } from "./excel";
 import { askGroq, GroqChatMessage, testGroqKey } from "./groq";
+import { connectHost, type Host } from "./host";
 import { marked } from "marked";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { deleteCharacter, loadCharacter, saveCharacter } from "./store";
 import { AI_TASKS, AiTask, DEFAULT_AI_TASK, findAiTask } from "./tasks";
-import { watchWordEvents } from "./word";
 
 marked.setOptions({ breaks: true, gfm: true });
 // リンクは、他のタブで安全に開く (target/rel はサニタイズ後に付け直さないと DOMPurify に消される)
@@ -236,15 +235,8 @@ function setSuggestion(text: string) {
 }
 
 function showSelection() {
-  if (typeof Office === "undefined" || !Office.context?.document) return;
-  Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (r) => {
-    if (r.status !== Office.AsyncResultStatus.Succeeded) {
-      setSuggestion("");
-      return;
-    }
-    const text = String(r.value ?? "");
-    setSuggestion(text);
-  });
+  if (!host) return;
+  void host.getSelectedText().then(setSuggestion, () => setSuggestion(""));
 }
 
 function onSelectionChanged() {
@@ -534,23 +526,14 @@ resultsOpenButton.addEventListener("click", () => resultsExternalUrl && openExte
 
 // --- Groq (AI) とのチャット。同じ結果パネルを使い回し、iframe の代わりにやり取りを積む ---
 const chatMessages = $("chat-messages");
-/** 実行中の Office ホスト (Word/Excel/PowerPoint)。Office.onReady で判明するまでは undefined */
-let officeHostName: string | undefined;
-
-function hostDisplayName(host: Office.HostType): string | undefined {
-  switch (host) {
-    case Office.HostType.Word: return "Word";
-    case Office.HostType.Excel: return "Excel";
-    case Office.HostType.PowerPoint: return "PowerPoint";
-    default: return undefined;
-  }
-}
+/** 作業ウィンドウを載せているアプリ (Word など)。connectHost() でつながるまでと、アプリの外で開いたときは undefined */
+let host: Host | undefined;
 
 /** 既定では日本語で答えさせる (指定しないと、モデルによって英語やアラビア語など別の言語で返ってくることがある)。
  *  実行中のホスト名は、性格 (編集・保存される文面) とは別に、送信のたびに現在の値を付け足す */
 function groqSystemPrompt(): GroqChatMessage {
   const persona = groqPersonaInput.value.trim() || DEFAULT_GROQ_PERSONA;
-  const content = officeHostName ? `${persona} 現在は Microsoft ${officeHostName} 上で動いています。` : persona;
+  const content = host?.name ? `${persona} 現在は ${host.name} 上で動いています。` : persona;
   return { role: "system", content };
 }
 /** 今回のパネルを開いてからのやり取り (システムプロンプトは含めない。Groq へ送るときに毎回付ける) */
@@ -916,44 +899,22 @@ soundButton.addEventListener("click", () => {
   } catch { /* ignore */ }
 });
 
-/**
- * Office のテーマ (ダークモードなど) を、配色 (taskpane.html の data-theme) に反映する。
- * ブラウザの prefers-color-scheme は、Office のテーマとは別の設定なので、取れるときは Office の値を優先する。
- */
-function applyOfficeTheme() {
-  const bg = Office.context?.officeTheme?.bodyBackgroundColor;
-  const m = bg && /^#?([0-9a-f]{6})/i.exec(bg);
-  if (!m) return;
-  const n = parseInt(m[1]!, 16);
-  const luminance = (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 0xff) + 0.0722 * (n & 0xff)) / 255;
-  document.documentElement.dataset.theme = luminance < 0.5 ? "dark" : "light";
-}
-
-void Office.onReady(async (info) => {
-  // Office.HostType.Word は 0 なので、if (info.host) だと Word のときだけ偽になってしまう。undefined と比べる
-  const inOffice = info.host !== undefined;
-  if (inOffice) applyOfficeTheme();
-  officeHostName = inOffice ? hostDisplayName(info.host) : undefined;
-  if (inOffice) {
-    Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged, (r) => {
-      if (r.status !== Office.AsyncResultStatus.Succeeded) {
-        setStatus(`選択変更イベントを登録できません: ${r.error.message}`);
-      }
+void (async () => {
+  host = await connectHost().catch(() => undefined);
+  if (host) {
+    // アプリ側の配色 (ダークモードなど) が取れれば、taskpane.html の data-theme に反映する
+    if (host.theme) document.documentElement.dataset.theme = host.theme;
+    host.watchSelection(onSelectionChanged).catch((e: unknown) => {
+      setStatus(`選択変更イベントを登録できません: ${(e as Error).message}`);
     });
     showSelection();
-  }
-  if (info.host === Office.HostType.Word) {
-    watchWordEvents({
-      onAnnotationInserted: () => reactTo("Congratulate", "Pleased", "Announce", "GetAttention"),
-      onAnnotationRemoved: () => reactTo("Confused", "Decline", "Sad"),
+    host.watchDocument({
+      onCommentAdded: () => reactTo("Congratulate", "Pleased", "Announce", "GetAttention"),
+      onCommentRemoved: () => reactTo("Confused", "Decline", "Sad"),
       onParagraphAdded,
+      onSheetActivated,
     }).catch((e: unknown) => {
-      setStatus(`コメント・段落イベントを登録できません: ${(e as Error).message}`);
-    });
-  }
-  if (info.host === Office.HostType.Excel) {
-    watchWorksheetActivated(onSheetActivated).catch((e: unknown) => {
-      setStatus(`シート切り替えイベントを登録できません: ${(e as Error).message}`);
+      setStatus(`ドキュメントのイベントを登録できません: ${(e as Error).message}`);
     });
   }
 
@@ -967,4 +928,4 @@ void Office.onReady(async (info) => {
   } else {
     setStatus("キャラクターファイルを選択してください。", "🐬をクリックして、Microsoft Agent のキャラクター (.acs) か、Office 97 のアシスタント (.act) を選択してください");
   }
-});
+})();
