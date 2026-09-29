@@ -1,12 +1,7 @@
-import { AcsPlayer } from "./acs/player";
-import { imageToDataUrl } from "./acs/icon";
-import { AcsCharacter } from "./acs/reader";
-import { ActCharacter, isActFile } from "./act/reader";
-import type { Character } from "./character";
+import { AcsCharacter, AcsPlayer, ActCharacter, IdleController, imageToDataUrl, isActFile, isIdleAnimation, type Character } from "@argynnini/msagent.js";
 import DOMPurify from "dompurify";
 import { watchWorksheetActivated } from "./excel";
 import { askGroq, GroqChatMessage, testGroqKey } from "./groq";
-import { IdleController, isIdleAnimation } from "./idle";
 import { marked } from "marked";
 import { buildEmbedUrl, buildSearchUrl, SEARCH_ENGINES } from "./search";
 import { deleteCharacter, loadCharacter, saveCharacter } from "./store";

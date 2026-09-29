@@ -1,7 +1,7 @@
 /** 指定アニメーションの先頭フレームを PNG に書き出す (目視確認用) */
 import { readFileSync, writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
-import { AcsCharacter } from "../src/acs/reader";
+import { AcsCharacter } from "@argynnini/msagent.js";
 
 const [path, animName, out] = process.argv.slice(2);
 if (!path || !animName || !out) throw new Error("usage: tsx scripts/render.ts <file.acs> <animation> <out.png>");

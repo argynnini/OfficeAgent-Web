@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { AcsCharacter } from "../src/acs/reader";
+import { AcsCharacter } from "@argynnini/msagent.js";
 
 const path = process.argv[2];
 if (!path) throw new Error("usage: npm run dump -- <file.acs>");

@@ -1,10 +1,4 @@
-import { AcsPlayer } from "./acs/player";
-import { imageToDataUrl } from "./acs/icon";
-import { AcsCharacter } from "./acs/reader";
-import { ActCharacter, isActFile } from "./act/reader";
-import type { Character } from "./character";
-import { IdleController, isIdleAnimation } from "./idle";
-import { Speaker, voiceParams } from "./speak";
+import { AcsCharacter, AcsPlayer, ActCharacter, IdleController, imageToDataUrl, isActFile, isIdleAnimation, Speaker, voiceParams, type Character } from "@argynnini/msagent.js";
 import { deleteCharacter, loadCharacter, saveCharacter } from "./store";
 
 const fileInput = document.getElementById("file") as HTMLInputElement;
