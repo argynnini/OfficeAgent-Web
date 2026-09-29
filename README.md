@@ -4,6 +4,7 @@
 
 [OfficeAgent](https://github.com/argynnini/OfficeAgent)（VSTO 版カイル君）の Office.js アドイン版です。
 Word / Excel / PowerPoint の作業ウィンドウにキャラクターを常駐させ、Web 版・Mac・Windows で動かすことを目指す実験的プロジェクトです。
+Google ドキュメント / スプレッドシート / スライドのサイドバーでも動きます（[Google で使う](#google-ドキュメントなどで使う)）。
 
 | デスクトップ (Windows) | Web |
 | :--: | :--: |
@@ -15,6 +16,7 @@ Word / Excel / PowerPoint の作業ウィンドウにキャラクターを常駐
 
 - [特長](#特長)
 - [はじめかた](#はじめかた)
+- [Google ドキュメントなどで使う](#google-ドキュメントなどで使う)
 - [キャラクターファイル (.acs) の入手](#キャラクターファイル-acs-の入手)
 - [機能](#機能)
 - [開発](#開発)
@@ -45,6 +47,29 @@ Word / Excel / PowerPoint の作業ウィンドウにキャラクターを常駐
 > [!NOTE]
 > キャラクターは `Greeting`（無いキャラクターは `Show`）のアニメーションで登場します。
 > 効果音は、ブラウザの制限により、作業ウィンドウを一度クリックするまで鳴りません。
+
+## Google ドキュメントなどで使う
+
+Google ドキュメント・スプレッドシート・スライドでは、Apps Script のサイドバーに、公開ページの作業ウィンドウを表示します。
+Apps Script 側のコード（[`apps-script/`](apps-script)）は、サイドバーを開いて選択範囲などを返すだけなので、作業ウィンドウの更新は GitHub Pages に公開されるたびに自動で反映されます。
+
+**1 つのファイルで使う（いちばん簡単）**
+
+1. Google ドキュメントなどで [拡張機能] > [Apps Script] を開きます。
+2. [プロジェクトの設定] で「"appsscript.json" マニフェスト ファイルをエディタで表示する」をオンにします。
+3. [`Code.gs`](apps-script/Code.gs)・[`appsscript.json`](apps-script/appsscript.json) の中身を貼り付け、HTML ファイル `Sidebar` を追加して [`Sidebar.html`](apps-script/Sidebar.html) の中身を貼り付けて保存します。
+4. ファイルを開き直すと、[拡張機能] > (プロジェクト名) > [表示] でサイドバーが開きます（初回は権限の確認が出ます。触れるのは、開いているファイルだけです）。
+
+**どのファイルでも使う（テスト デプロイ）**
+
+[script.google.com](https://script.google.com/) で新しいプロジェクトを作って同じように貼り付け、[デプロイ] > [デプロイをテスト] > [エディタ アドイン] で、試すファイルを選んで実行します。
+[clasp](https://github.com/google/clasp) を使う場合は、`apps-script/` で `clasp create` / `clasp push` します。
+
+> [!NOTE]
+> - Google 側には選択の変更や編集のイベントが無いので、2 秒ごとに問い合わせています。選択範囲や操作への反応は、少し遅れます。
+> - 反応する操作は、段落の追加（ドキュメント）とシートの切り替え（スプレッドシート）です。コメントには反応しません。
+> - ブラウザの保存場所が Office とは分かれるので、`.acs`・API キー・設定は、Google 側でもう一度選び直す必要があります。
+> - 開発中は、スクリプト プロパティ `APP_URL` に `https://localhost:3000/taskpane.html` を設定すると、手元の開発サーバーを表示します。
 
 ## キャラクターファイル (.acs) の入手
 
@@ -138,6 +163,7 @@ master に push すると、GitHub Actions（`.github/workflows/deploy.yml`）�
 - `.acs` / `.act` の解析・再生・読み上げ・待機動作は、[msagent.js](https://github.com/argynnini/msagent.js)（このプロジェクトから切り出したライブラリ）に任せる。GitHub のタグ（`package.json` の `github:argynnini/msagent.js#v0.1.0`）から入れる。
   - 公開ページのデモは、msagent.js の `Agent`（画面に浮かび、ドラッグで動かせるキャラクター）をそのまま使う。
   - 作業ウィンドウは、吹き出しに入力欄や検索ボタンを入れるため、msagent.js の部品（`AcsPlayer`・`IdleController` など）で組み立てる。
+- Office.js などのアプリの API は `src/host/` だけが使い、作業ウィンドウ (`taskpane.ts`) は `Host`（選択範囲・選択の変更・操作のイベント・配色・アプリ名）を通して触る。Office は `host/office.ts`、Google は `host/google.ts`（`taskpane.html?host=google` で開いたとき。Apps Script には、サイドバーの `postMessage` を中継して問い合わせる）。
 - サーバー側の処理は持たない。
 
 ## 実装状況とロードマップ

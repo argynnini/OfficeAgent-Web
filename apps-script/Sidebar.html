@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      iframe { display: block; border: 0; width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <!-- 作業ウィンドウの本体 (GitHub Pages の taskpane.html)。URL は Code.gs の showSidebar() が決める -->
+    <iframe id="app" src="<?= appSrc ?>" allow="clipboard-read; clipboard-write; autoplay"></iframe>
+    <script>
+      // 作業ウィンドウからの問い合わせを、google.script.run で Code.gs に中継する。呼べるのは METHODS の関数だけ
+      var METHODS = ['getState'];
+      var frame = document.getElementById('app');
+      var appOrigin = new URL(frame.src).origin;
+
+      window.addEventListener('message', function (e) {
+        if (e.source !== frame.contentWindow || e.origin !== appOrigin) return;
+        var data = e.data || {};
+        if (data.type !== 'officeagent:call' || METHODS.indexOf(data.method) < 0) return;
+        var reply = function (message) {
+          message.type = 'officeagent:result';
+          message.id = data.id;
+          frame.contentWindow.postMessage(message, appOrigin);
+        };
+        google.script.run
+          .withSuccessHandler(function (result) { reply({ result: result }); })
+          .withFailureHandler(function (error) { reply({ error: String((error && error.message) || error) }); })
+          [data.method].apply(null, data.args || []);
+      });
+    </script>
+  </body>
+</html>

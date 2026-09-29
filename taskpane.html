@@ -24,7 +24,16 @@
         true
       );
     </script>
-    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <!--
+      office.js は Office の中でだけ読み込む。Google のサイドバー (?host=google) など、Office の外で iframe に埋め込まれると、
+      office.js はページを about:blank に差し替えてしまうため。
+      Office では今までどおり、ここで (ページのコードより先に) 同期で読み込まれるよう、document.write で書き出す。
+    -->
+    <script>
+      if (new URLSearchParams(location.search).get("host") !== "google") {
+        document.write('<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"><\/script>');
+      }
+    </script>
     <style>
       html { height: 100%; }
       /*
